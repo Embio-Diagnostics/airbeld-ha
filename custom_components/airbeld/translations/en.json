@@ -1,0 +1,20 @@
+{
+  "config": {
+    "step": {
+      "pick_implementation": {
+        "title": "Choose authentication method"
+      }
+    },
+    "abort": {
+      "already_configured": "Account is already configured",
+      "missing_credentials": "Missing OAuth2 credentials. Please configure Application Credentials first."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Airbeld Options"
+      }
+    }
+  }
+}
