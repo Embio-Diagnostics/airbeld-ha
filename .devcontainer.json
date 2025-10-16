@@ -1,7 +1,7 @@
 {
     "name": "Airbeld Home Assistant Integration",
     "image": "mcr.microsoft.com/devcontainers/python:3.13",
-    "postCreateCommand": "scripts/setup",
+    "postCreateCommand": "scripts/setup --pip",
     "forwardPorts": [
         8123
     ],

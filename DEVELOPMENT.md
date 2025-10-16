@@ -4,8 +4,10 @@ This guide helps you set up a development environment for the Airbeld Home Assis
 
 ## Table of Contents
 
-1. [Quick Start (Dev Container)](#quick-start-dev-container) - Recommended
-2. [Local Development (Alternative)](#local-development-alternative)
+1. [Quick Start (Dev Container)](#quick-start-dev-container)
+2. [Local Development](#local-development)
+   - [Setup with pip](#setup-with-pip)
+   - [Setup with uv](#setup-with-uv)
 3. [Scripts Reference](#scripts-reference)
 4. [Testing Your Changes](#testing-your-changes)
 5. [Code Style](#code-style)
@@ -15,7 +17,7 @@ This guide helps you set up a development environment for the Airbeld Home Assis
 
 ## Quick Start (Dev Container)
 
-**Recommended for contributors** - Get a complete development environment with one click.
+Recommended approach for contributors. The devcontainer automatically creates a virtual environment and installs all dependencies.
 
 ### Prerequisites
 
@@ -23,97 +25,96 @@ This guide helps you set up a development environment for the Airbeld Home Assis
 - [Visual Studio Code](https://code.visualstudio.com/)
 - [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
 
-### Setup Steps
+### Setup
 
-1. **Clone the repository:**
+1. Clone the repository:
    ```bash
    git clone https://github.com/Embio-Diagnostics/airbeld-ha.git
    cd airbeld-ha
    ```
 
-2. **Open in VSCode:**
+2. Open in VSCode:
    ```bash
    code .
    ```
 
-3. **Reopen in Container:**
-   - VSCode will detect `.devcontainer.json`
-   - Click "Reopen in Container" when prompted
-   - Container will automatically:
-     - Install Python 3.13
-     - Run `scripts/setup` to install dependencies
-     - Install Home Assistant
-     - Forward port 8123
+3. Reopen in Container when prompted (VSCode will detect `.devcontainer.json`)
+   - Container automatically runs `scripts/setup --pip`
+   - Creates `.venv/` and installs dependencies (takes ~1-2 minutes)
 
-4. **Start developing:**
+4. Start Home Assistant:
    ```bash
-   # In the VSCode terminal (inside container):
    ./scripts/develop
    ```
 
-5. **Visit Home Assistant:**
-   - Open http://localhost:8123
-   - Complete onboarding
-   - Add Airbeld integration
-
-### What You Get
-
-✅ Isolated Python 3.13 environment
-✅ Home Assistant pre-installed
-✅ All dependencies auto-installed
-✅ Ruff linter and formatter
-✅ Integration automatically loaded
-✅ No configuration needed
+5. Visit <http://localhost:8123> to complete onboarding
 
 ---
 
-## Local Development (Alternative)
+## Local Development
 
-Prefer working outside containers? You can develop locally using a Python virtual environment.
+Local development using Python virtual environments. Choose pip (standard) or uv (faster).
 
 ### Prerequisites
 
-- Python 3.13 or higher
+- Python 3.13.2+ (required by Home Assistant 2025.10+)
 - Git
+- Note: uv can auto-install Python 3.13 if needed
 
-### Setup Steps
+### Setup with pip
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/Embio-Diagnostics/airbeld-ha.git
-   cd airbeld-ha
-   ```
+```bash
+git clone https://github.com/Embio-Diagnostics/airbeld-ha.git
+cd airbeld-ha
+./scripts/setup --pip
+source .venv/bin/activate
+./scripts/develop
+```
 
-2. **Bootstrap the environment:**
-   ```bash
-   ./scripts/bootstrap
-   ```
+Visit <http://localhost:8123> to complete onboarding.
 
-   This creates a `.venv/` directory and installs all dependencies.
+### Setup with uv
 
-3. **Activate the virtual environment:**
-   ```bash
-   source .venv/bin/activate
-   ```
+Install uv (one-time):
 
-   *Tip: Scripts will auto-activate `.venv/` if it exists, so this is optional.*
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
 
-4. **Run Home Assistant:**
-   ```bash
-   ./scripts/develop
-   ```
+Setup:
 
-5. **Visit Home Assistant:**
-   - Open http://localhost:8123
-   - Complete onboarding
-   - Add Airbeld integration
+```bash
+git clone https://github.com/Embio-Diagnostics/airbeld-ha.git
+cd airbeld-ha
+./scripts/setup --uv
+source .venv/bin/activate
+./scripts/develop
+```
 
-### What You Get
+Visit <http://localhost:8123> to complete onboarding.
 
-✅ Local Python virtual environment
-✅ Full control over dependencies
-✅ Fast iteration without Docker
-✅ Works on any OS with Python 3.13+
+**Note:** uv can auto-install Python versions: `./scripts/setup --uv --python 3.13`
+
+### Update Dependencies
+
+After pulling changes or when dependencies are updated:
+
+```bash
+./scripts/setup --update
+# Or specify package manager:
+./scripts/setup --update --uv
+```
+
+### Modify Dependencies
+
+**Source of truth:** `pyproject.toml` (edit this file)
+
+After modifying dependencies in `pyproject.toml`:
+
+```bash
+./scripts/sync-deps  # Generates requirements.txt for pip users
+git add pyproject.toml requirements.txt uv.lock  # uv.lock created by uv sync
+```
 
 ---
 
@@ -121,42 +122,68 @@ Prefer working outside containers? You can develop locally using a Python virtua
 
 All scripts work in both dev container and local environments. They automatically detect and use `.venv/` if present.
 
-### `./scripts/bootstrap`
+### `./scripts/setup`
 
-**Purpose:** One-time setup for local development
+**Purpose:** Setup development environment or update dependencies
 
 **What it does:**
-- Creates `.venv/` virtual environment
-- Upgrades pip
-- Installs all dependencies from `requirements.txt`
+- Creates `.venv/` virtual environment (if needed)
+- **uv:** Installs from `pyproject.toml` using `uv sync --no-install-project` (creates `uv.lock`)
+- **pip:** Installs from `requirements.txt` (generated from `pyproject.toml`)
 
-**When to use:**
-- First time setting up locally
-- After cleaning your environment
+**Options:**
+- `--pip` - Use pip package manager (default)
+- `--uv` - Use uv package manager (faster, reads pyproject.toml)
+- `--python X.Y` - Use specific Python version (e.g., 3.13)
+- `--update` - Only update dependencies (skip venv creation)
+- `--help` - Show help message
 
-**Example:**
+**Examples:**
 ```bash
-./scripts/bootstrap
+# Initial setup with pip
+./scripts/setup --pip
+
+# Initial setup with uv (faster, modern)
+./scripts/setup --uv
+
+# Specify Python version
+./scripts/setup --pip --python 3.13
+./scripts/setup --uv --python 3.13  # uv auto-downloads Python
+
+# Update dependencies only (faster than recreating venv)
+./scripts/setup --update
+./scripts/setup --update --uv
+
+# Show help
+./scripts/setup --help
 ```
 
 ---
 
-### `./scripts/setup`
+### `./scripts/sync-deps`
 
-**Purpose:** Install or update dependencies
+**Purpose:** Generate `requirements.txt` from `pyproject.toml`
 
 **What it does:**
-- Detects if `.venv/` exists and activates it
-- Installs/updates dependencies from `requirements.txt`
-- Works globally if no venv exists
+- Reads dependencies from `pyproject.toml`
+- Generates pinned `requirements.txt` for pip users
+- Run this after editing dependencies in `pyproject.toml`
 
 **When to use:**
-- After pulling new changes
-- When `requirements.txt` is updated
+- After adding/updating dependencies in `pyproject.toml`
+- Before committing dependency changes
 
 **Example:**
 ```bash
-./scripts/setup
+# Edit pyproject.toml dependencies
+vim pyproject.toml
+
+# Generate requirements.txt
+./scripts/sync-deps
+
+# Commit both files
+git add pyproject.toml requirements.txt
+git commit -m "Update dependencies"
 ```
 
 ---
@@ -286,10 +313,10 @@ git diff
 **Symptom:** `ModuleNotFoundError: No module named 'airbeld'`
 
 **Solutions:**
-1. Verify SDK is installed: `pip show airbeld-api-sdk`
-2. Re-run setup: `./scripts/setup`
+1. Verify SDK is installed: `pip show airbeld-api-sdk` or `uv pip list | grep airbeld`
+2. Update dependencies: `./scripts/setup --update`
 3. In dev container: restart container
-4. Locally: re-run `./scripts/bootstrap`
+4. Locally: re-run `./scripts/setup --pip` (or `--uv`)
 
 ---
 
@@ -341,14 +368,25 @@ pkill -f "hass --config"
 1. Remove and recreate venv:
    ```bash
    rm -rf .venv
-   ./scripts/bootstrap
+   ./scripts/setup --pip  # or --uv
    ```
 
 2. Manually activate and check:
    ```bash
    source .venv/bin/activate
-   python --version  # Should be 3.13+
+   python --version  # Should be 3.13.2+
+
+   # For pip:
    pip list | grep airbeld
+
+   # For uv:
+   uv pip list | grep airbeld
+   ```
+
+3. If using older Python (< 3.13.2), use uv to install correct version:
+   ```bash
+   rm -rf .venv
+   ./scripts/setup --uv --python 3.13
    ```
 
 ---
@@ -356,7 +394,6 @@ pkill -f "hass --config"
 ## Need Help?
 
 - **Bug reports:** [GitHub Issues](https://github.com/Embio-Diagnostics/airbeld-ha/issues)
-- **Questions:** [GitHub Discussions](https://github.com/Embio-Diagnostics/airbeld-ha/discussions)
 - **Contributing:** See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ---

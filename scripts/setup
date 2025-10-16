@@ -4,16 +4,223 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-# Check if running in virtual environment or if .venv exists
-if [[ -n "$VIRTUAL_ENV" ]]; then
-    echo "✓ Using active virtual environment: $VIRTUAL_ENV"
-    python3 -m pip install --requirement requirements.txt
-elif [[ -d ".venv" ]]; then
-    echo "✓ Found .venv/, activating..."
-    source .venv/bin/activate
-    python3 -m pip install --requirement requirements.txt
+# Default values
+PACKAGE_MANAGER="pip"
+PYTHON_VERSION=""
+UPDATE_ONLY=false
+
+# Help message
+show_help() {
+    cat << EOF
+Usage: ./scripts/setup [OPTIONS]
+
+Setup the Airbeld development environment.
+
+OPTIONS:
+    --pip           Use pip package manager (default)
+    --uv            Use uv package manager (faster)
+    --python X.Y    Use specific Python version (e.g., 3.13)
+    --update        Only update dependencies (skip venv creation)
+    --help          Show this help message
+
+EXAMPLES:
+    ./scripts/setup                    # Create venv with pip and system Python
+    ./scripts/setup --uv               # Create venv with uv and system Python
+    ./scripts/setup --python 3.13      # Create venv with pip and Python 3.13
+    ./scripts/setup --uv --python 3.13 # Create venv with uv and Python 3.13
+    ./scripts/setup --update           # Just update dependencies in existing venv
+
+For more information, see DEVELOPMENT.md
+EOF
+    exit 0
+}
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --pip)
+            PACKAGE_MANAGER="pip"
+            shift
+            ;;
+        --uv)
+            PACKAGE_MANAGER="uv"
+            shift
+            ;;
+        --python)
+            PYTHON_VERSION="$2"
+            shift 2
+            ;;
+        --update)
+            UPDATE_ONLY=true
+            shift
+            ;;
+        --help|-h)
+            show_help
+            ;;
+        *)
+            echo "❌ Unknown option: $1"
+            echo "   Run './scripts/setup --help' for usage"
+            exit 1
+            ;;
+    esac
+done
+
+if [[ "$UPDATE_ONLY" == true ]]; then
+    echo "🔄 Updating dependencies..."
 else
-    echo "⚠️  No virtual environment found."
-    echo "   Installing globally (use './scripts/bootstrap' to create venv)"
-    python3 -m pip install --requirement requirements.txt
+    echo "🚀 Setting up Airbeld development environment..."
 fi
+echo "   Package manager: $PACKAGE_MANAGER"
+echo
+
+# Check package manager availability
+if [[ "$PACKAGE_MANAGER" == "uv" ]]; then
+    if ! command -v uv &> /dev/null; then
+        echo "❌ Error: uv not found but --uv was specified"
+        echo
+        echo "   Install uv with:"
+        echo "   curl -LsSf https://astral.sh/uv/install.sh | sh"
+        echo
+        echo "   Or use pip instead:"
+        echo "   ./scripts/bootstrap --pip"
+        exit 1
+    fi
+    echo "✓ Found uv $(uv --version)"
+fi
+
+# Determine Python command
+if [[ -n "$PYTHON_VERSION" ]]; then
+    if [[ "$PACKAGE_MANAGER" == "uv" ]]; then
+        # uv can install and use specific Python versions
+        echo "📦 Ensuring Python $PYTHON_VERSION is available via uv..."
+        uv python install "$PYTHON_VERSION" --quiet 2>/dev/null || true
+        PYTHON_CMD="$PYTHON_VERSION"
+    else
+        # For pip, check if python<version> exists
+        PYTHON_CMD="python$PYTHON_VERSION"
+        if ! command -v "$PYTHON_CMD" &> /dev/null; then
+            echo "❌ Error: $PYTHON_CMD not found"
+            echo
+            echo "   Either:"
+            echo "   1. Install Python $PYTHON_VERSION on your system"
+            echo "   2. Use uv which can install Python versions:"
+            echo "      ./scripts/bootstrap --uv --python $PYTHON_VERSION"
+            exit 1
+        fi
+    fi
+else
+    PYTHON_CMD="python3"
+    if ! command -v "$PYTHON_CMD" &> /dev/null; then
+        echo "❌ Error: python3 not found. Please install Python 3.12 or higher."
+        exit 1
+    fi
+fi
+
+# Check Python version
+if [[ "$PACKAGE_MANAGER" == "pip" ]]; then
+    DETECTED_VERSION=$($PYTHON_CMD --version 2>&1 | awk '{print $2}')
+    echo "✓ Found Python $DETECTED_VERSION"
+
+    # Warn if Python < 3.13.2
+    MAJOR=$(echo "$DETECTED_VERSION" | cut -d. -f1)
+    MINOR=$(echo "$DETECTED_VERSION" | cut -d. -f2)
+    PATCH=$(echo "$DETECTED_VERSION" | cut -d. -f3)
+
+    if [[ "$MAJOR" -lt 3 ]] || \
+       [[ "$MAJOR" -eq 3 && "$MINOR" -lt 13 ]] || \
+       [[ "$MAJOR" -eq 3 && "$MINOR" -eq 13 && "${PATCH:-0}" -lt 2 ]]; then
+        echo "❌ Error: Home Assistant 2025.10+ requires Python >=3.13.2"
+        echo "   You have Python $DETECTED_VERSION"
+        echo "   Please upgrade Python or use uv to install the correct version:"
+        echo "   ./scripts/setup --uv --python 3.13"
+        echo
+        exit 1
+    fi
+fi
+
+# Handle existing virtual environment or update-only mode
+if [[ "$UPDATE_ONLY" == true ]]; then
+    if [[ ! -d ".venv" ]]; then
+        echo "❌ Error: --update requires existing .venv/"
+        echo "   Run './scripts/setup' without --update to create it first"
+        exit 1
+    fi
+    echo "✓ Found existing .venv/"
+    source .venv/bin/activate
+elif [[ -d ".venv" ]]; then
+    echo "⚠️  Virtual environment already exists at .venv/"
+    # Only prompt if running interactively (has a terminal)
+    if [[ -t 0 ]]; then
+        read -p "   Remove and recreate? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            echo "🗑️  Removing old .venv/..."
+            rm -rf .venv
+        else
+            echo "   Keeping existing .venv/"
+            echo "   Tip: Run './scripts/setup --update' to update dependencies"
+            exit 0
+        fi
+    else
+        # Non-interactive (e.g., devcontainer postCreateCommand)
+        echo "   Keeping existing .venv/ (non-interactive mode)"
+        echo "   Tip: Run './scripts/setup --update' to update dependencies"
+        exit 0
+    fi
+fi
+
+# Create virtual environment (unless --update)
+if [[ "$UPDATE_ONLY" == false ]]; then
+    echo "📦 Creating virtual environment..."
+    if [[ "$PACKAGE_MANAGER" == "uv" ]]; then
+        if [[ -n "$PYTHON_VERSION" ]]; then
+            uv venv --python "$PYTHON_CMD"
+        else
+            uv venv
+        fi
+    else
+        $PYTHON_CMD -m venv .venv
+    fi
+    echo "✓ Virtual environment created at .venv/"
+
+    # Activate virtual environment
+    echo "🔌 Activating virtual environment..."
+    source .venv/bin/activate
+fi
+
+# Install dependencies
+if [[ "$PACKAGE_MANAGER" == "uv" ]]; then
+    echo "📥 Installing dependencies from pyproject.toml..."
+    echo "   Using uv sync (fast mode)..."
+    # --no-install-project: only install dependencies, not the project itself (to avoid editable install conflicts with symlinks)
+    # --all-extras: install all optional dependency groups (including [dev])
+    # --frozen: use existing uv.lock if available, don't update it
+    if [[ -f "uv.lock" ]]; then
+        uv sync --no-install-project --all-extras --frozen
+    else
+        uv sync --no-install-project --all-extras
+    fi
+else
+    echo "📥 Installing dependencies from requirements.txt..."
+    echo "   Using pip..."
+    python -m pip install --upgrade pip --quiet
+    pip install -r requirements.txt --quiet
+fi
+
+echo
+if [[ "$UPDATE_ONLY" == true ]]; then
+    echo "✅ Dependencies updated!"
+else
+    echo "✅ Setup complete!"
+    echo
+    echo "📝 Next steps:"
+    echo "   1. Activate the virtual environment:"
+    echo "      source .venv/bin/activate"
+    echo
+    echo "   2. Run Home Assistant with the integration:"
+    echo "      ./scripts/develop"
+    echo
+    echo "   3. Lint your code:"
+    echo "      ./scripts/lint"
+fi
+echo

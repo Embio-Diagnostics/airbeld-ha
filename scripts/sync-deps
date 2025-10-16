@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+echo "🔄 Syncing dependencies from pyproject.toml to requirements.txt..."
+echo
+
+# Check if uv is installed
+if ! command -v uv &> /dev/null; then
+    echo "❌ Error: uv not found"
+    echo
+    echo "   Install uv with:"
+    echo "   curl -LsSf https://astral.sh/uv/install.sh | sh"
+    exit 1
+fi
+
+# Generate requirements.txt from pyproject.toml dev dependencies
+echo "📝 Generating requirements.txt from pyproject.toml..."
+uv pip compile pyproject.toml -o requirements.txt --extra dev --quiet
+
+echo "✅ requirements.txt updated!"
+echo
+echo "📋 Summary:"
+wc -l < requirements.txt | xargs echo "   Generated" && echo "lines in requirements.txt"
+echo
+echo "💡 Tip: Commit both pyproject.toml and requirements.txt"

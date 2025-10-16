@@ -1,0 +1,72 @@
+[project]
+authors = [
+  {name = "Lazaros Doougiakis", email = "lazarosd89@gmail.com"},
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Home Automation",
+]
+description = "Airbeld Home Assistant Integration"
+keywords = ["homeassistant", "airbeld", "air-quality", "integration"]
+license = {text = "MIT"}
+name = "airbeld-ha"
+readme = "README.md"
+requires-python = ">=3.13.2"
+version = "0.1.0"
+
+# Runtime dependencies (what the integration needs when running in HA)
+dependencies = [
+  "airbeld-api-sdk>=0.4.0",
+]
+
+[project.urls]
+Documentation = "https://github.com/Embio-Diagnostics/airbeld-ha#readme"
+Homepage = "https://github.com/Embio-Diagnostics/airbeld-ha"
+Issues = "https://github.com/Embio-Diagnostics/airbeld-ha/issues"
+Repository = "https://github.com/Embio-Diagnostics/airbeld-ha.git"
+
+[project.optional-dependencies]
+# Development dependencies (local testing)
+dev = [
+  "homeassistant>=2025.10.2",
+  "colorlog>=6.9.0",
+  "ruff>=0.8.0",
+]
+
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools>=61.0"]
+
+[tool.setuptools.packages.find]
+include = ["custom_components*"]
+where = ["."]
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+
+[tool.ruff.lint]
+ignore = [
+  "E501", # line too long (black handles this)
+]
+select = [
+  "E", # pycodestyle errors
+  "W", # pycodestyle warnings
+  "F", # pyflakes
+  "I", # isort
+  "C", # flake8-comprehensions
+  "B", # flake8-bugbear
+  "UP", # pyupgrade
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"] # Allow unused imports in __init__.py
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+force-sort-within-sections = true
+known-first-party = ["custom_components.airbeld"]

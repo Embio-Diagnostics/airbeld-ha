@@ -7,6 +7,9 @@ __pycache__/
 dist/
 build/
 
+# Shell redirect junk files (from unquoted version specifiers)
+=*
+
 # IDE
 .DS_Store
 .idea/
@@ -17,9 +20,15 @@ build/
 venv/
 env/
 
+# uv (commit uv.lock for reproducibility)
+# uv.lock is intentionally NOT ignored
+
 # Development environment
 dev/
 
 # Logs
 *.log
 
+# Home Assistant configuration
+config/
+!config/configuration.yaml
