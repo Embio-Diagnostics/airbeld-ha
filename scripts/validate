@@ -1,37 +1,76 @@
 #!/usr/bin/env bash
 #
-# Run hassfest validation locally using Docker
-# This validates manifest.json, strings.json, and integration structure
-# following the same checks as GitHub Actions
+# Local validation script for Airbeld integration
+# Performs basic checks before pushing to GitHub
 #
 
 set -e
 
 cd "$(dirname "$0")/.."
 
-echo "🔍 Running hassfest validation locally..."
+INTEGRATION_PATH="custom_components/airbeld"
+
+echo "🔍 Running local validation checks..."
 echo ""
 
-# Run hassfest using the official Home Assistant validation container
-docker run --rm \
-  -v "$(pwd)/custom_components:/github/workspace/custom_components:ro" \
-  ghcr.io/home-assistant/home-assistant/amd64-homeassistant:dev \
-  python3 -m script.hassfest \
-  --integration-path /github/workspace/custom_components/airbeld \
-  --requirements || {
-    echo ""
-    echo "❌ Hassfest validation failed!"
-    echo ""
-    echo "Common issues:"
-    echo "  - Invalid manifest.json syntax"
-    echo "  - Missing required files (strings.json, translations/en.json)"
-    echo "  - Invalid domain or requirements format"
-    echo ""
+# Check 1: Validate manifest.json syntax
+echo "Checking manifest.json..."
+if ! python3 -m json.tool "$INTEGRATION_PATH/manifest.json" > /dev/null 2>&1; then
+    echo "❌ Invalid manifest.json syntax"
     exit 1
-  }
+fi
+echo "✅ manifest.json is valid JSON"
+
+# Check 2: Validate strings.json syntax
+echo "Checking strings.json..."
+if ! python3 -m json.tool "$INTEGRATION_PATH/strings.json" > /dev/null 2>&1; then
+    echo "❌ Invalid strings.json syntax"
+    exit 1
+fi
+echo "✅ strings.json is valid JSON"
+
+# Check 3: Validate translations/en.json syntax
+echo "Checking translations/en.json..."
+if ! python3 -m json.tool "$INTEGRATION_PATH/translations/en.json" > /dev/null 2>&1; then
+    echo "❌ Invalid translations/en.json syntax"
+    exit 1
+fi
+echo "✅ translations/en.json is valid JSON"
+
+# Check 4: Required files exist
+echo "Checking required files..."
+REQUIRED_FILES=(
+    "$INTEGRATION_PATH/__init__.py"
+    "$INTEGRATION_PATH/manifest.json"
+    "$INTEGRATION_PATH/strings.json"
+    "$INTEGRATION_PATH/translations/en.json"
+)
+
+for file in "${REQUIRED_FILES[@]}"; do
+    if [[ ! -f "$file" ]]; then
+        echo "❌ Missing required file: $file"
+        exit 1
+    fi
+done
+echo "✅ All required files present"
+
+# Check 5: Manifest has required fields
+echo "Checking manifest required fields..."
+MANIFEST=$(cat "$INTEGRATION_PATH/manifest.json")
+REQUIRED_FIELDS=("domain" "name" "version" "documentation" "requirements" "codeowners" "iot_class")
+
+for field in "${REQUIRED_FIELDS[@]}"; do
+    if ! echo "$MANIFEST" | python3 -c "import sys, json; data=json.load(sys.stdin); sys.exit(0 if '$field' in data else 1)" 2>/dev/null; then
+        echo "❌ Missing required field in manifest.json: $field"
+        exit 1
+    fi
+done
+echo "✅ All required manifest fields present"
 
 echo ""
-echo "✅ Hassfest validation passed!"
+echo "✅ Local validation passed!"
 echo ""
-echo "Note: HACS validation requires pushing to GitHub."
-echo "      Run both locally with: ./scripts/lint && ./scripts/validate"
+echo "Note: Full hassfest and HACS validation run on GitHub Actions."
+echo "      Push your changes to see complete validation results."
+echo ""
+echo "Run both checks with: ./scripts/lint && ./scripts/validate"
