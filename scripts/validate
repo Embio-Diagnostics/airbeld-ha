@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+#
+# Run hassfest validation locally using Docker
+# This validates manifest.json, strings.json, and integration structure
+# following the same checks as GitHub Actions
+#
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+echo "🔍 Running hassfest validation locally..."
+echo ""
+
+# Run hassfest using the official Home Assistant validation container
+docker run --rm \
+  -v "$(pwd)/custom_components:/github/workspace/custom_components:ro" \
+  ghcr.io/home-assistant/home-assistant/amd64-homeassistant:dev \
+  python3 -m script.hassfest \
+  --integration-path /github/workspace/custom_components/airbeld \
+  --requirements || {
+    echo ""
+    echo "❌ Hassfest validation failed!"
+    echo ""
+    echo "Common issues:"
+    echo "  - Invalid manifest.json syntax"
+    echo "  - Missing required files (strings.json, translations/en.json)"
+    echo "  - Invalid domain or requirements format"
+    echo ""
+    exit 1
+  }
+
+echo ""
+echo "✅ Hassfest validation passed!"
+echo ""
+echo "Note: HACS validation requires pushing to GitHub."
+echo "      Run both locally with: ./scripts/lint && ./scripts/validate"

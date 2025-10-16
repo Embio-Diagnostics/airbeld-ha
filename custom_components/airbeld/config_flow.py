@@ -1,13 +1,16 @@
 """Config flow for Airbeld integration."""
+
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from homeassistant.config_entries import ConfigFlowResult
-from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import config_entry_oauth2_flow
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigFlowResult
+    from homeassistant.core import HomeAssistant
+    from homeassistant.data_entry_flow import FlowResult
 
 from .const import (
     DOMAIN,
@@ -20,13 +23,17 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_register_implementation(hass: HomeAssistant) -> None:
-    """Register the OAuth2 implementation if not already registered.
+    """
+    Register the OAuth2 implementation if not already registered.
 
-    This ensures the implementation is available even if async_setup hasn't been called yet,
-    which can happen when adding the integration for the first time through the UI.
+    This ensures the implementation is available even if async_setup
+    hasn't been called yet, which can happen when adding the integration
+    for the first time through the UI.
     """
     # Check if implementation already exists by getting the dict of implementations
-    implementations = await config_entry_oauth2_flow.async_get_implementations(hass, DOMAIN)
+    implementations = await config_entry_oauth2_flow.async_get_implementations(
+        hass, DOMAIN
+    )
 
     if implementations:
         _LOGGER.debug("OAuth2 implementation already registered")
@@ -73,7 +80,8 @@ class OAuth2FlowHandler(
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle a flow initialized by the user.
+        """
+        Handle a flow initialized by the user.
 
         Ensure OAuth2 implementation is registered before proceeding.
         """
@@ -86,7 +94,8 @@ class OAuth2FlowHandler(
     async def async_step_pick_implementation(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle implementation picking.
+        """
+        Handle implementation picking.
 
         Ensure OAuth2 implementation is registered before the base class checks for it.
         """

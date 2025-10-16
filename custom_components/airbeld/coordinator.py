@@ -1,16 +1,19 @@
 """DataUpdateCoordinator for Airbeld."""
+
 from __future__ import annotations
 
-from datetime import timedelta
 import logging
-from typing import Any
-
-from airbeld import AirbeldClient
+from datetime import timedelta
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.const import CONF_ACCESS_TOKEN
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers import config_entry_oauth2_flow
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers import config_entry_oauth2_flow
+
+    from airbeld import AirbeldClient
 
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
 
@@ -50,48 +53,49 @@ class AirbeldDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             device_readings_list = await self.client.async_get_all_readings_by_date()
             _LOGGER.debug("Fetched data for %d devices", len(device_readings_list))
 
-            data = {}
-
-            # Process each device's readings
-            for device_reading in device_readings_list:
-                device_data = {
-                    "device": device_reading,  # DeviceReadings object with id, name, sensors, etc.
-                    "telemetry": {},
-                }
-
-                # Store full metric objects with metadata from SDK
-                for sensor_name, metric in device_reading.sensors.items():
-                    try:
-                        latest_value = device_reading.get_latest_value(sensor_name)
-                        if latest_value is not None:
-                            # Store both the value and the full metric for metadata
-                            device_data["telemetry"][sensor_name] = {
-                                "value": latest_value,
-                                "display_name": metric.display_name or metric.name,
-                                "unit": metric.unit,
-                                "description": metric.description,
-                            }
-                    except Exception as sensor_err:
-                        _LOGGER.debug(
-                            "Failed to process %s sensor on device %s: %s",
-                            sensor_name,
-                            device_reading.id,
-                            sensor_err,
-                        )
-
-                data[device_reading.id] = device_data
-
-            return data
-
         except Exception as err:
             # Enhanced error logging for API issues
             error_details = str(err)
-            if hasattr(err, 'status_code'):
+            if hasattr(err, "status_code"):
                 error_details = f"HTTP {err.status_code}: {error_details}"
-            if hasattr(err, 'response_body'):
+            if hasattr(err, "response_body"):
                 error_details = f"{error_details} | Response: {err.response_body}"
 
-            _LOGGER.error("Error communicating with Airbeld API: %s", error_details)
-            _LOGGER.debug("Full exception details: %s", err, exc_info=True)
+            _LOGGER.exception("Error communicating with Airbeld API: %s", error_details)
 
-            raise UpdateFailed(f"Error communicating with API: {err}") from err
+            error_msg = f"Error communicating with API: {err}"
+            raise UpdateFailed(error_msg) from err
+
+        # Process each device's readings
+        data = {}
+        for device_reading in device_readings_list:
+            # DeviceReadings object with id, name, sensors, etc.
+            device_data = {
+                "device": device_reading,
+                "telemetry": {},
+            }
+
+            # Store full metric objects with metadata from SDK
+            for sensor_name, metric in device_reading.sensors.items():
+                try:
+                    latest_value = device_reading.get_latest_value(sensor_name)
+                    if latest_value is not None:
+                        # Store both the value and the full metric for metadata
+                        device_data["telemetry"][sensor_name] = {
+                            "value": latest_value,
+                            "display_name": metric.display_name or metric.name,
+                            "unit": metric.unit,
+                            "description": metric.description,
+                        }
+                except Exception:  # noqa: BLE001
+                    # Intentionally broad - don't let one sensor error break all updates
+                    _LOGGER.debug(
+                        "Failed to process %s sensor on device %s",
+                        sensor_name,
+                        device_reading.id,
+                        exc_info=True,
+                    )
+
+            data[device_reading.id] = device_data
+
+        return data

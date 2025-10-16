@@ -1,14 +1,17 @@
 """Support for Airbeld sensors."""
+
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, SENSOR_DEVICE_CLASSES
 from .coordinator import AirbeldDataUpdateCoordinator
@@ -43,7 +46,7 @@ async def async_setup_entry(
                 )
             )
 
-    async_add_entities(entities, False)
+    async_add_entities(entities, update_before_add=False)
 
 
 class AirbeldSensor(CoordinatorEntity[AirbeldDataUpdateCoordinator], SensorEntity):
@@ -67,7 +70,7 @@ class AirbeldSensor(CoordinatorEntity[AirbeldDataUpdateCoordinator], SensorEntit
         # Entity attributes - use SDK's display_name
         # Don't include device name in entity name - HA automatically prepends it
         self._attr_unique_id = f"airbeld_{device_id}_{sensor_name}"
-        self._attr_name = metric_data['display_name']
+        self._attr_name = metric_data["display_name"]
 
         # Sensor configuration from SDK metadata
         # For AQI sensors, HA expects None instead of "-"
@@ -123,10 +126,13 @@ class AirbeldSensor(CoordinatorEntity[AirbeldDataUpdateCoordinator], SensorEntit
             telemetry = device_data.get("telemetry", {})
             metric_data = telemetry.get(self._sensor_name)
 
-            if metric_data and isinstance(metric_data, dict):
-                # Add description if available
-                if metric_data.get("description"):
-                    attributes["description"] = metric_data["description"]
+            # Add description if available
+            if (
+                metric_data
+                and isinstance(metric_data, dict)
+                and metric_data.get("description")
+            ):
+                attributes["description"] = metric_data["description"]
 
         return attributes
 
@@ -147,5 +153,6 @@ class AirbeldSensor(CoordinatorEntity[AirbeldDataUpdateCoordinator], SensorEntit
         if device and hasattr(device, "status"):
             return device.status != "offline"
 
-        # Default to available if we have data (async_get_all_readings_by_date only returns online devices)
+        # Default to available if we have data
+        # (async_get_all_readings_by_date only returns online devices)
         return True

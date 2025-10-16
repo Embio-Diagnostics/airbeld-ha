@@ -2,13 +2,7 @@
 
 from __future__ import annotations
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
-from homeassistant.const import (
-    CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
-    CONCENTRATION_PARTS_PER_MILLION,
-    PERCENTAGE,
-    UnitOfTemperature,
-)
+from homeassistant.components.sensor import SensorDeviceClass
 
 DOMAIN = "airbeld"
 
@@ -19,7 +13,7 @@ DEFAULT_SCAN_INTERVAL = 180  # seconds (3 minutes)
 # Client ID is public and safe to include in code
 OAUTH2_CLIENT_ID = "ZWPpC5dpPHKrunK2yy2KVl2tKiAhwk7n"
 OAUTH2_AUTHORIZE = "https://auth.embiodiagnostics.eu/authorize"
-OAUTH2_TOKEN = "https://auth.embiodiagnostics.eu/oauth/token"
+OAUTH2_TOKEN = "https://auth.embiodiagnostics.eu/oauth/token"  # noqa: S105
 
 # API Configuration
 DEFAULT_API_BASE = "https://api.airbeld.com"
