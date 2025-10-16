@@ -26,9 +26,15 @@ Thank you for your interest in contributing!
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
 4. Test locally (see [DEVELOPMENT.md](DEVELOPMENT.md))
-5. Commit with clear messages
-6. Push to your fork
-7. Open a Pull Request
+5. Run validation before committing:
+
+   ```bash
+   ./scripts/lint && ./scripts/validate
+   ```
+
+6. Commit with clear messages
+7. Push to your fork
+8. Open a Pull Request
 
 ### Development Setup
 

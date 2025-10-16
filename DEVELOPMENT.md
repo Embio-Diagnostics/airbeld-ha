@@ -233,6 +233,37 @@ git commit -m "Update dependencies"
 
 ---
 
+### `./scripts/validate`
+
+**Purpose:** Validate integration structure and configuration files
+
+**What it does:**
+
+- Validates `manifest.json` JSON syntax
+- Validates `strings.json` JSON syntax
+- Validates `translations/en.json` JSON syntax
+- Checks all required files exist
+- Verifies manifest has required fields (domain, name, version, etc.)
+
+**When to use:**
+
+- Before committing changes (catches common mistakes)
+- After modifying manifest.json or strings.json
+- To ensure integration structure is correct
+
+**Example:**
+
+```bash
+./scripts/validate
+
+# Run both validation scripts
+./scripts/lint && ./scripts/validate
+```
+
+**Note:** This runs lightweight local checks. Full hassfest and HACS validation run on GitHub Actions.
+
+---
+
 ## Testing Your Changes
 
 ### In Dev Container
@@ -284,13 +315,28 @@ The project uses `.ruff.toml` matching Home Assistant Core standards:
 
 ### Before Committing
 
+Always run both validation scripts before committing:
+
 ```bash
-# Auto-format and fix issues
+# Run linting (format + check code style)
 ./scripts/lint
+
+# Run validation (check JSON syntax + required files)
+./scripts/validate
+
+# Or run both at once
+./scripts/lint && ./scripts/validate
 
 # Check for remaining issues
 git diff
 ```
+
+**What each script does:**
+
+- `./scripts/lint` - Formats code with ruff and fixes linting issues
+- `./scripts/validate` - Validates manifest.json, strings.json, translations, and required files
+
+**Important:** Both scripts must pass before pushing to GitHub. They catch common issues that would cause CI failures.
 
 ---
 
