@@ -60,7 +60,7 @@ audioop-lts==0.2.1
     # via
     #   homeassistant
     #   standard-aifc
-awesomeversion==25.5.0
+awesomeversion==25.8.0
     # via homeassistant
 bcrypt==4.3.0
     # via homeassistant
