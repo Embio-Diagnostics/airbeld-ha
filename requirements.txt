@@ -286,7 +286,7 @@ tzdata==2025.2
     # via aiozoneinfo
 uart-devices==0.1.1
     # via bluetooth-adapters
-ulid-transform==1.4.0
+ulid-transform==1.5.2
     # via homeassistant
 urllib3==2.5.0
     # via
