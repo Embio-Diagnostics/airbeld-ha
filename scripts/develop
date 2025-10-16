@@ -4,17 +4,32 @@ set -e
 
 cd "$(dirname "$0")/.."
 
+# Activate virtual environment if it exists (for local development)
+if [[ -d ".venv" ]] && [[ -z "$VIRTUAL_ENV" ]]; then
+    echo "✓ Activating virtual environment (.venv/)"
+    source .venv/bin/activate
+fi
+
 # Create config dir if not present
 if [[ ! -d "${PWD}/config" ]]; then
     mkdir -p "${PWD}/config"
     hass --config "${PWD}/config" --script ensure_config
 fi
 
-# Set the path to custom_components
-## This let's us have the structure we want <root>/custom_components/integration_blueprint
-## while at the same time have Home Assistant configuration inside <root>/config
-## without resulting to symlinks.
-export PYTHONPATH="${PYTHONPATH}:${PWD}/custom_components"
+# Create custom_components directory in config if it doesn't exist
+mkdir -p "${PWD}/config/custom_components"
+
+# Create symlink to integration (remove old one if exists)
+if [[ -L "${PWD}/config/custom_components/airbeld" ]]; then
+    rm "${PWD}/config/custom_components/airbeld"
+elif [[ -d "${PWD}/config/custom_components/airbeld" ]]; then
+    rm -rf "${PWD}/config/custom_components/airbeld"
+fi
+ln -s "${PWD}/custom_components/airbeld" "${PWD}/config/custom_components/airbeld"
+
+echo "✓ Linked integration: config/custom_components/airbeld -> custom_components/airbeld"
+echo "🚀 Starting Home Assistant..."
+echo
 
 # Start Home Assistant
 hass --config "${PWD}/config" --debug

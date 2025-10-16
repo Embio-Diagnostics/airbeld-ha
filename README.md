@@ -1,12 +1,19 @@
-# Airbeld Integration for Home Assistant
+<div align="center">
+  <img src="images/airbeld.png" alt="Airbeld" width="200"/>
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Default-blue.svg)](https://github.com/hacs/integration)
-[![GitHub Release](https://img.shields.io/github/release/Embio-Diagnostics/airbeld-ha.svg)](https://github.com/Embio-Diagnostics/airbeld-ha/releases)
-[![License](https://img.shields.io/github/license/Embio-Diagnostics/airbeld-ha.svg)](LICENSE)
+  # Airbeld Integration for Home Assistant
 
-Official Home Assistant integration for **Airbeld air quality monitoring devices**.
+  **Official Home Assistant integration for Airbeld air quality monitoring devices**
 
-Monitor your indoor air quality in real-time with temperature, humidity, PM2.5, CO2 sensors and more.
+  [![hacs_badge](https://img.shields.io/badge/HACS-Default-blue.svg)](https://github.com/hacs/integration)
+  [![GitHub Release](https://img.shields.io/github/release/Embio-Diagnostics/airbeld-ha.svg)](https://github.com/Embio-Diagnostics/airbeld-ha/releases)
+  [![License](https://img.shields.io/github/license/Embio-Diagnostics/airbeld-ha.svg)](LICENSE)
+
+  Monitor your indoor air quality in real-time with temperature, humidity, PM2.5, CO2 sensors and more.
+
+</div>
+
+---
 
 ## Features
 
@@ -19,7 +26,8 @@ Monitor your indoor air quality in real-time with temperature, humidity, PM2.5, 
   - Humidity
   - PM2.5 (particulate matter)
   - CO2 levels
-  - And more...
+  - VOC (Volatile Organic Compounds)
+  - NOx (Nitrogen Oxides)
 
 ## Installation
 
@@ -84,16 +92,22 @@ For more issues, please [open an issue](https://github.com/Embio-Diagnostics/air
 
 ## Contributing
 
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting pull requests.
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) and [DEVELOPMENT.md](DEVELOPMENT.md) before submitting pull requests.
 
 ## License
 
 This integration is licensed under the [MIT License](LICENSE).
 
-## About Airbeld
-
-Airbeld provides professional-grade air quality monitoring solutions for homes and businesses. Learn more at [airbeld.com](https://airbeld.com).
-
 ---
 
-**Note**: This is a community integration. For official Airbeld support, please contact Embio Diagnostics.
+<div align="center">
+
+## About
+
+<img src="images/EmbioDiagnostics.png" alt="Embio Diagnostics" width="120"/>
+
+**Airbeld** is developed by [**Embio Diagnostics**](https://embiodiagnostics.eu), providing professional-grade air quality monitoring solutions for homes and businesses.
+
+Learn more at [airbeld.com](https://airbeld.com)
+
+</div>
