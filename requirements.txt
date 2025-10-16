@@ -221,7 +221,7 @@ pyjwt==2.10.1
     #   hass-nabucasa
     #   homeassistant
     #   pycognito
-pyopenssl==25.1.0
+pyopenssl==25.3.0
     # via
     #   acme
     #   homeassistant
