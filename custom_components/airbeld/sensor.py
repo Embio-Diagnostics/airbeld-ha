@@ -65,8 +65,9 @@ class AirbeldSensor(CoordinatorEntity[AirbeldDataUpdateCoordinator], SensorEntit
         self._sensor_name = sensor_name
 
         # Entity attributes - use SDK's display_name
+        # Don't include device name in entity name - HA automatically prepends it
         self._attr_unique_id = f"airbeld_{device_id}_{sensor_name}"
-        self._attr_name = f"{device.name} {metric_data['display_name']}"
+        self._attr_name = metric_data['display_name']
 
         # Sensor configuration from SDK metadata
         # For AQI sensors, HA expects None instead of "-"
@@ -77,20 +78,22 @@ class AirbeldSensor(CoordinatorEntity[AirbeldDataUpdateCoordinator], SensorEntit
         self._attr_device_class = SENSOR_DEVICE_CLASSES.get(sensor_name)
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
-        # Store description as extra state attribute if available
-        if metric_data.get("description"):
-            self._attr_extra_state_attributes = {
-                "description": metric_data["description"]
-            }
-
     @property
     def device_info(self) -> dict[str, Any]:
         """Return device information."""
+        # Use display_name as the main title, device.name as the model (subtitle)
+        device_name = self._device.display_name or self._device.name
+        device_model = self._device.name if self._device.display_name else None
+
+        # Add device type if available (DeviceSummary has it, DeviceReadings doesn't)
+        if hasattr(self._device, "type") and self._device.type:
+            device_model = f"{device_model or ''} {self._device.type}".strip()
+
         return {
             "identifiers": {(DOMAIN, self._device_id)},
-            "name": self._device.display_name or self._device.name,
+            "name": device_name,
             "manufacturer": "Airbeld",
-            "model": getattr(self._device, "type", None),
+            "model": device_model,
             "sw_version": None,
         }
 
@@ -108,6 +111,24 @@ class AirbeldSensor(CoordinatorEntity[AirbeldDataUpdateCoordinator], SensorEntit
             return metric_data.get("value")
 
         return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        attributes = {}
+
+        # Get current device data
+        device_data = self.coordinator.data.get(self._device_id)
+        if device_data:
+            telemetry = device_data.get("telemetry", {})
+            metric_data = telemetry.get(self._sensor_name)
+
+            if metric_data and isinstance(metric_data, dict):
+                # Add description if available
+                if metric_data.get("description"):
+                    attributes["description"] = metric_data["description"]
+
+        return attributes
 
     @property
     def available(self) -> bool:

@@ -27,19 +27,25 @@ PLATFORMS: list[Platform] = [Platform.SENSOR]
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the Airbeld component."""
-    # Register OAuth2 implementation with embedded credentials
-    config_entry_oauth2_flow.async_register_implementation(
-        hass,
-        DOMAIN,
-        config_entry_oauth2_flow.LocalOAuth2Implementation(
+    try:
+        # Register OAuth2 implementation with embedded credentials
+        config_entry_oauth2_flow.async_register_implementation(
             hass,
             DOMAIN,
-            client_id=OAUTH2_CLIENT_ID,
-            client_secret=None,  # PKCE flow - no secret needed
-            authorize_url=OAUTH2_AUTHORIZE,
-            token_url=OAUTH2_TOKEN,
-        ),
-    )
+            config_entry_oauth2_flow.LocalOAuth2Implementation(
+                hass,
+                DOMAIN,
+                client_id=OAUTH2_CLIENT_ID,
+                client_secret=None,  # PKCE flow - no secret needed
+                authorize_url=OAUTH2_AUTHORIZE,
+                token_url=OAUTH2_TOKEN,
+            ),
+        )
+        _LOGGER.debug("OAuth2 implementation registered")
+    except Exception as err:
+        _LOGGER.error("Failed to register OAuth2 implementation: %s", err, exc_info=True)
+        # Don't fail setup - the config flow will handle registration if needed
+
     return True
 
 
@@ -56,21 +62,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     try:
         await session.async_ensure_token_valid()
-        _LOGGER.debug("OAuth2 token validation successful")
     except Exception as err:
         _LOGGER.error("Token validation failed: %s", err)
         return False
-    
+
     # Get the current access token
     access_token = session.token[CONF_ACCESS_TOKEN]
-    _LOGGER.debug("Retrieved OAuth2 access token (length: %d)", len(access_token) if access_token else 0)
-    
-    # Create the Airbeld client
-    client = AirbeldClient(
-        token=access_token,
-        base_url=DEFAULT_API_BASE,
-    )
-    _LOGGER.debug("Created AirbeldClient with base_url: %s", DEFAULT_API_BASE)
+
+    # Create the Airbeld client in executor to avoid blocking I/O during SSL setup
+    def create_client() -> AirbeldClient:
+        """Create AirbeldClient with blocking operations in executor."""
+        return AirbeldClient(token=access_token, base_url=DEFAULT_API_BASE)
+
+    client = await hass.async_add_executor_job(create_client)
     
     # Create the data coordinator with OAuth2 session for token refresh
     coordinator = AirbeldDataUpdateCoordinator(hass, client, session)

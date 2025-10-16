@@ -2,12 +2,13 @@
   "config": {
     "step": {
       "pick_implementation": {
-        "title": "Choose authentication method"
+        "title": "Airbeld Authentication"
       }
     },
     "abort": {
       "already_configured": "Account is already configured",
-      "missing_credentials": "Missing OAuth2 credentials. Please configure Application Credentials first."
+      "missing_configuration": "Authentication setup failed. Please restart Home Assistant and try again.",
+      "oauth_error": "Authentication failed. Please try again or check your Airbeld account credentials."
     }
   },
   "options": {

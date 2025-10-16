@@ -45,12 +45,10 @@ class AirbeldDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Update client with potentially refreshed token
             current_token = self.session.token[CONF_ACCESS_TOKEN]
             self.client.set_token(current_token)
-            _LOGGER.debug("Updated client token (length: %d)", len(current_token) if current_token else 0)
 
             # Fetch all devices with latest readings in a single API call
-            _LOGGER.debug("Calling API to fetch all devices with readings from: %s", self.client.base_url)
             device_readings_list = await self.client.async_get_all_readings_by_date()
-            _LOGGER.debug("Successfully fetched %d devices with readings", len(device_readings_list))
+            _LOGGER.debug("Fetched data for %d devices", len(device_readings_list))
 
             data = {}
 
@@ -83,7 +81,6 @@ class AirbeldDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
                 data[device_reading.id] = device_data
 
-            _LOGGER.debug("Updated data for %d devices", len(data))
             return data
 
         except Exception as err:
