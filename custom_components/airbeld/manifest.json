@@ -1,9 +1,15 @@
 {
   "domain": "airbeld",
   "name": "Airbeld",
-  "version": "0.1.0",
+  "codeowners": [
+    "@lazos89"
+  ],
   "config_flow": true,
   "dependencies": [],
+  "documentation": "https://github.com/Embio-Diagnostics/airbeld-ha",
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/Embio-Diagnostics/airbeld-ha/issues",
   "requirements": [
     "airbeld-api-sdk>=0.4.0"
   ],
