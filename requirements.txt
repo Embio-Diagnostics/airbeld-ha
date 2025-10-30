@@ -246,7 +246,7 @@ requests==2.32.5
     #   acme
     #   homeassistant
     #   pycognito
-ruff==0.14.0
+ruff==0.14.2
     # via airbeld-ha (pyproject.toml)
 s3transfer==0.14.0
     # via boto3
