@@ -72,7 +72,7 @@ class OAuth2FlowHandler(
     def extra_authorize_data(self) -> dict[str, Any]:
         """Extra data that needs to be appended to the authorize url."""
         return {
-            "scope": "openid profile email",
+            "scope": "openid profile email offline_access",
             "audience": "https://airbeld-drf/api",
             "code_challenge_method": "S256",  # PKCE SHA-256 method
         }
