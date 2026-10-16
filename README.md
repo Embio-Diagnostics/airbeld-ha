@@ -61,7 +61,8 @@
 
 ## Requirements
 
-- Home Assistant 2024.1.0 or newer
+- Home Assistant 2024.6.0 or newer (test endpoints: 2024.6.0 and 2026.10.1;
+  see [compatibility limitations](docs/ha-compatibility.md))
 - Airbeld account with registered devices
 - Internet connection (cloud-based integration)
 

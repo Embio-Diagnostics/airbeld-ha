@@ -1,0 +1,25 @@
+services:
+  homeassistant:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: dev
+    ports:
+      - "127.0.0.1:8123:8123"
+    environment:
+      AIRBELD_DEV_MODE: local
+    volumes:
+      - ha-local:/config
+      - ./custom_components:/config/custom_components:ro
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8123', timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 60
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "2"
+volumes:
+  ha-local:

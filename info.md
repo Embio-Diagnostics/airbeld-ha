@@ -19,7 +19,7 @@ Monitor your indoor air quality with Airbeld devices directly in Home Assistant.
 ## Requirements
 
 - Airbeld account with registered devices
-- Home Assistant 2024.1.0+
+- Home Assistant 2024.6.0+ (see `docs/ha-compatibility.md` for test-environment limitations)
 - Internet connection
 
 Secure authentication via Auth0 OAuth2.

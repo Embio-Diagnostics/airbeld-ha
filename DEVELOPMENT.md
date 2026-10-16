@@ -12,6 +12,8 @@ This guide helps you set up a development environment for the Airbeld Home Assis
 4. [Testing Your Changes](#testing-your-changes)
 5. [Code Style](#code-style)
 6. [Troubleshooting](#troubleshooting)
+7. [Development HA containers](#development-ha-containers)
+8. [Dependency PR review](#dependency-pr-review)
 
 ---
 
@@ -39,8 +41,8 @@ Recommended approach for contributors. The devcontainer automatically creates a 
    ```
 
 3. Reopen in Container when prompted (VSCode will detect `.devcontainer.json`)
-   - Container automatically runs `scripts/setup --pip`
-   - Creates `.venv/` and installs dependencies (takes ~1-2 minutes)
+   - Container automatically runs `scripts/setup --uv`
+   - Creates `.venv/` and installs the locked root dependencies
 
 4. Start Home Assistant:
    ```bash
@@ -48,6 +50,9 @@ Recommended approach for contributors. The devcontainer automatically creates a 
    ```
 
 5. Visit <http://localhost:8123> to complete onboarding
+
+The host-native runner uses the production API when Airbeld is added; use
+[`just dev-staging`](#development-ha-containers) for test accounts.
 
 ---
 
@@ -57,9 +62,9 @@ Local development using Python virtual environments. Choose pip (standard) or uv
 
 ### Prerequisites
 
-- Python 3.13.2+ (required by Home Assistant 2025.10+)
+- Python 3.14.2+ (required by the pinned Home Assistant 2026.10.1 environment)
 - Git
-- Note: uv can auto-install Python 3.13 if needed
+- Note: uv can auto-install Python 3.14 if needed
 
 ### Setup with pip
 
@@ -93,7 +98,8 @@ source .venv/bin/activate
 
 Visit <http://localhost:8123> to complete onboarding.
 
-**Note:** uv can auto-install Python versions: `./scripts/setup --uv --python 3.13`
+**Note:** uv can auto-install Python versions: `./scripts/setup --uv --python 3.14`
+The root's `dev` dependency group is installed by default; it is not a `--extra dev` extra.
 
 ### Update Dependencies
 
@@ -112,15 +118,19 @@ After pulling changes or when dependencies are updated:
 After modifying dependencies in `pyproject.toml`:
 
 ```bash
-./scripts/sync-deps  # Generates requirements.txt for pip users
-git add pyproject.toml requirements.txt uv.lock  # uv.lock created by uv sync
+uv lock
+uv lock --project ci/ha-min  # if the floor project's dependencies changed too
+./scripts/sync-deps  # Exports frozen requirements.txt for pip users
+git add pyproject.toml requirements.txt uv.lock
 ```
 
 ---
 
 ## Scripts Reference
 
-All scripts work in both dev container and local environments. They automatically detect and use `.venv/` if present.
+The host-native scripts work in both dev container and local environments.
+`scripts/develop` and `scripts/lint` activate `.venv/` if present; activate it
+yourself before `scripts/validate` if needed.
 
 ### `./scripts/setup`
 
@@ -128,13 +138,13 @@ All scripts work in both dev container and local environments. They automaticall
 
 **What it does:**
 - Creates `.venv/` virtual environment (if needed)
-- **uv:** Installs from `pyproject.toml` using `uv sync --no-install-project` (creates `uv.lock`)
-- **pip:** Installs from `requirements.txt` (generated from `pyproject.toml`)
+- **uv:** Installs from `pyproject.toml` using `uv sync --no-install-project`; the default `dev` dependency group is included, and an existing lock is used with `--frozen`
+- **pip:** Installs from `requirements.txt` (exported from the root lock)
 
 **Options:**
 - `--pip` - Use pip package manager (default)
 - `--uv` - Use uv package manager (faster, reads pyproject.toml)
-- `--python X.Y` - Use specific Python version (e.g., 3.13)
+- `--python X.Y` - Use specific Python version (e.g., 3.14)
 - `--update` - Only update dependencies (skip venv creation)
 - `--help` - Show help message
 
@@ -147,8 +157,8 @@ All scripts work in both dev container and local environments. They automaticall
 ./scripts/setup --uv
 
 # Specify Python version
-./scripts/setup --pip --python 3.13
-./scripts/setup --uv --python 3.13  # uv auto-downloads Python
+./scripts/setup --pip --python 3.14
+./scripts/setup --uv --python 3.14  # uv auto-downloads Python
 
 # Update dependencies only (faster than recreating venv)
 ./scripts/setup --update
@@ -162,27 +172,28 @@ All scripts work in both dev container and local environments. They automaticall
 
 ### `./scripts/sync-deps`
 
-**Purpose:** Generate `requirements.txt` from `pyproject.toml`
+**Purpose:** Generate `requirements.txt` from the root's locked dependencies
 
 **What it does:**
-- Reads dependencies from `pyproject.toml`
+- Exports `uv.lock`, including the `dev` dependency group
 - Generates pinned `requirements.txt` for pip users
-- Run this after editing dependencies in `pyproject.toml`
+- Run this after locking dependency changes in `pyproject.toml`
 
 **When to use:**
-- After adding/updating dependencies in `pyproject.toml`
+- After adding/updating dependencies in `pyproject.toml` and running `uv lock`
 - Before committing dependency changes
 
 **Example:**
 ```bash
 # Edit pyproject.toml dependencies
 vim pyproject.toml
+uv lock
 
 # Generate requirements.txt
 ./scripts/sync-deps
 
-# Commit both files
-git add pyproject.toml requirements.txt
+# Commit the dependency files together
+git add pyproject.toml requirements.txt uv.lock
 git commit -m "Update dependencies"
 ```
 
@@ -209,6 +220,9 @@ git commit -m "Update dependencies"
 ```
 
 **Access:** http://localhost:8123
+
+This runner retains the production API default. Signing in uses a real production
+account; use `just dev-staging` for test accounts and isolated container state.
 
 ---
 
@@ -260,7 +274,8 @@ git commit -m "Update dependencies"
 ./scripts/lint && ./scripts/validate
 ```
 
-**Note:** This runs lightweight local checks. Full hassfest and HACS validation run on GitHub Actions.
+**Note:** This runs lightweight local checks. `just ci` also runs official
+hassfest locally; full upstream HACS validation remains in GitHub Actions.
 
 ---
 
@@ -283,14 +298,80 @@ Same as dev container - the workflow is identical!
 ### Running Tests
 
 ```bash
-# Lint your code
-./scripts/lint
-
-# Check for errors
-python -m py_compile custom_components/airbeld/*.py
+just ci
 ```
 
----
+### Automated gate
+
+Install Docker (with Compose v2.24+), uv and just. The integration is not a
+distributable Python package: both uv projects use `package = false`.
+
+```sh
+uv sync --frozen
+uv sync --frozen --project ci/ha-min
+just ci
+```
+
+`just ci` runs Ruff check/format, both pinned HA test environments, the H1–H7
+manifest checker, credential-free local HACS metadata checks, and the official
+digest-pinned hassfest image with networking disabled and source mounted read-only.
+The local metadata checker checks the declared floor, name, layout, config flow,
+version, runtime requirements, required local files and JSON syntax. It is **not
+full HACS validation**: `hacs/action` remains the owner gate after push.
+
+The root tests need Python 3.14.2+ (pin: 3.14). Floor tests need Python 3.12;
+see [compatibility](docs/ha-compatibility.md) for dependency overrides and limitations.
+For targeted iteration:
+
+```sh
+uv run --frozen --offline pytest -q tests/test_characterization.py
+uv run --frozen --offline --project ci/ha-min pytest -q tests/test_characterization.py
+uv run --frozen --offline python scripts/check_defects.py --verify-unfixed
+```
+
+Tests use HA's `hass` fixture, the **real SDK**, and `httpx.MockTransport` at
+its HTTP boundary. No live backend or login is needed. Strict xfails record
+desired H1–H7 behavior; the checker runs them with `--runxfail` and inspects the
+original exception type. The task fixing a defect changes its manifest state to
+`fixed` and removes its xfail in the same diff; never loosen an assertion.
+
+When changing dependencies, run `uv lock` in each affected project and
+`bash scripts/sync-deps` to export the root's frozen requirements for pip users.
+Pip users need Python 3.14.2+ and install `requirements.txt`.
+
+## Development HA containers
+
+```sh
+just dev                 # http://localhost:8123
+just dev-staging         # http://localhost:8124
+just dev-down
+just dev-staging-down
+```
+
+Both commands build the pinned HA 2026.10.1 image with SDK 0.4.0 preinstalled,
+boot without credentials, mount the integration read-only, and use separate named
+Docker volumes. No HA config, database, token or log is written into the checkout.
+HA's own image remains root because its bundled runtime expects that layout;
+this is a local development container, not a production deployment.
+
+`dev` boots HA for onboarding without making API requests until the owner adds
+Airbeld. **"Local" mode still talks to the production API:** the integration's
+`DEFAULT_API_BASE` is `https://api.airbeld.com`, so signing in there uses a real
+production account. Use **`just dev-staging` for test accounts**.
+`dev-staging` replaces the API base **only in that container's Python
+memory**, before HA starts, with the documented staging App Service origin:
+`https://airbeld-staging-api-fmb3htfqfua5hhgk.westeurope-01.azurewebsites.net`.
+The v1 SDK appends `/api/v1`; task 21 changes the integration to SDK v2.
+Auth0 is shared between environments as the initiative specifies.
+
+Complete HA onboarding, then Settings → Devices & services → Add integration →
+Airbeld. Signing in with a dedicated test account and seeing staging sensors is
+an **owner-only manual check**. Do not store credentials or tokens in this repo
+or evidence. Persistent HA state lives in its named volume; `down` retains it.
+
+The VS Code devcontainer uses Python 3.14. `scripts/setup --uv` installs the
+locked root environment; `scripts/develop` is the older host-native runner.
+Container commands above are preferred for isolated state.
 
 ## Code Style
 
@@ -308,7 +389,7 @@ This project follows Home Assistant code standards:
 ### Ruff Configuration
 
 The project uses `.ruff.toml` matching Home Assistant Core standards:
-- Python 3.13 target
+- Python 3.13 target (the integration's syntax target, separate from the newest-HA Python 3.14 environment)
 - Comprehensive rule set
 - Auto-fixes common issues
 - Compatible with `black` formatting
@@ -327,6 +408,9 @@ Always run both validation scripts before committing:
 # Or run both at once
 ./scripts/lint && ./scripts/validate
 
+# Run the automated gate, including tests on both HA versions
+just ci
+
 # Check for remaining issues
 git diff
 ```
@@ -336,7 +420,8 @@ git diff
 - `./scripts/lint` - Formats code with ruff and fixes linting issues
 - `./scripts/validate` - Validates manifest.json, strings.json, translations, and required files
 
-**Important:** Both scripts must pass before pushing to GitHub. They catch common issues that would cause CI failures.
+**Important:** Both scripts and `just ci` must pass before pushing to GitHub.
+Full upstream HACS validation is still a post-push owner gate.
 
 ---
 
@@ -420,7 +505,7 @@ pkill -f "hass --config"
 2. Manually activate and check:
    ```bash
    source .venv/bin/activate
-   python --version  # Should be 3.13.2+
+   python --version  # Should be 3.14.2+ for the newest-HA environment
 
    # For pip:
    pip list | grep airbeld
@@ -429,13 +514,18 @@ pkill -f "hass --config"
    uv pip list | grep airbeld
    ```
 
-3. If using older Python (< 3.13.2), use uv to install correct version:
+3. If using older Python (< 3.14.2), use uv to install correct version:
    ```bash
    rm -rf .venv
-   ./scripts/setup --uv --python 3.13
+   ./scripts/setup --uv --python 3.14
    ```
 
 ---
+
+## Dependency PR review
+
+See [recorded recommendations](docs/dependabot-recommendations.md). No PR is
+merged, closed, commented on or pushed by this task.
 
 ## Need Help?
 

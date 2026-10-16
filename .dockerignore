@@ -1,0 +1,4 @@
+*
+!scripts/
+scripts/*
+!scripts/dev_bootstrap.py

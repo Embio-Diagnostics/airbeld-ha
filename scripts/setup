@@ -19,15 +19,15 @@ Setup the Airbeld development environment.
 OPTIONS:
     --pip           Use pip package manager (default)
     --uv            Use uv package manager (faster)
-    --python X.Y    Use specific Python version (e.g., 3.13)
+    --python X.Y    Use specific Python version (e.g., 3.14)
     --update        Only update dependencies (skip venv creation)
     --help          Show this help message
 
 EXAMPLES:
     ./scripts/setup                    # Create venv with pip and system Python
     ./scripts/setup --uv               # Create venv with uv and system Python
-    ./scripts/setup --python 3.13      # Create venv with pip and Python 3.13
-    ./scripts/setup --uv --python 3.13 # Create venv with uv and Python 3.13
+    ./scripts/setup --python 3.14      # Create venv with pip and Python 3.14
+    ./scripts/setup --uv --python 3.14 # Create venv with uv and Python 3.14
     ./scripts/setup --update           # Just update dependencies in existing venv
 
 For more information, see DEVELOPMENT.md
@@ -121,18 +121,18 @@ if [[ "$PACKAGE_MANAGER" == "pip" ]]; then
     DETECTED_VERSION=$($PYTHON_CMD --version 2>&1 | awk '{print $2}')
     echo "✓ Found Python $DETECTED_VERSION"
 
-    # Warn if Python < 3.13.2
+    # The pinned newest HA dev environment requires Python >=3.14.2.
     MAJOR=$(echo "$DETECTED_VERSION" | cut -d. -f1)
     MINOR=$(echo "$DETECTED_VERSION" | cut -d. -f2)
     PATCH=$(echo "$DETECTED_VERSION" | cut -d. -f3)
 
     if [[ "$MAJOR" -lt 3 ]] || \
-       [[ "$MAJOR" -eq 3 && "$MINOR" -lt 13 ]] || \
-       [[ "$MAJOR" -eq 3 && "$MINOR" -eq 13 && "${PATCH:-0}" -lt 2 ]]; then
-        echo "❌ Error: Home Assistant 2025.10+ requires Python >=3.13.2"
+       [[ "$MAJOR" -eq 3 && "$MINOR" -lt 14 ]] || \
+       [[ "$MAJOR" -eq 3 && "$MINOR" -eq 14 && "${PATCH:-0}" -lt 2 ]]; then
+        echo "❌ Error: Home Assistant 2026.10.1 requires Python >=3.14.2"
         echo "   You have Python $DETECTED_VERSION"
         echo "   Please upgrade Python or use uv to install the correct version:"
-        echo "   ./scripts/setup --uv --python 3.13"
+        echo "   ./scripts/setup --uv --python 3.14"
         echo
         exit 1
     fi

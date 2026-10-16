@@ -18,7 +18,7 @@ fi
 
 # Generate requirements.txt from pyproject.toml dev dependencies
 echo "📝 Generating requirements.txt from pyproject.toml..."
-uv pip compile pyproject.toml -o requirements.txt --extra dev --quiet
+uv export --frozen --no-emit-project --output-file requirements.txt
 
 echo "✅ requirements.txt updated!"
 echo

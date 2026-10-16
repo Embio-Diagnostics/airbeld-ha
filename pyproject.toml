@@ -29,21 +29,24 @@ Homepage = "https://github.com/Embio-Diagnostics/airbeld-ha"
 Issues = "https://github.com/Embio-Diagnostics/airbeld-ha/issues"
 Repository = "https://github.com/Embio-Diagnostics/airbeld-ha.git"
 
-[project.optional-dependencies]
-# Development dependencies (local testing)
+[dependency-groups]
 dev = [
-  "homeassistant>=2025.10.2",
-  "colorlog>=6.9.0",
-  "ruff>=0.8.0",
+  "homeassistant==2026.10.1",
+  "pytest-homeassistant-custom-component==0.13.372",
+  "ruff==0.14.2",
 ]
 
-[build-system]
-build-backend = "setuptools.build_meta"
-requires = ["setuptools>=61.0"]
+[tool.uv]
+package = false
 
-[tool.setuptools.packages.find]
-include = ["custom_components*"]
-where = ["."]
+[tool.uv.dependency-groups]
+dev = {requires-python = ">=3.14.2"}
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+addopts = "--strict-markers -p no:cacheprovider"
 
 [tool.ruff]
 line-length = 88

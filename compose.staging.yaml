@@ -1,0 +1,11 @@
+services:
+  homeassistant:
+    ports: !override
+      - "127.0.0.1:8124:8123"
+    environment:
+      AIRBELD_DEV_MODE: staging
+    volumes: !override
+      - ha-staging:/config
+      - ./custom_components:/config/custom_components:ro
+volumes:
+  ha-staging:

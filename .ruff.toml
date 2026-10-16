@@ -23,3 +23,9 @@ keep-runtime-typing = true
 
 [lint.mccabe]
 max-complexity = 25
+
+[lint.per-file-ignores]
+# HA fixtures are injected/untyped; assertions and fake auth are test mechanisms.
+"tests/*.py" = ["ANN001", "ANN201", "ANN202", "D103", "INP001", "S101", "S106", "SLF001", "PLR2004", "ARG005"]
+# Standalone CLI scripts intentionally print diagnostics and use SystemExit messages.
+"scripts/*.py" = ["INP001", "T201", "TRY003", "EM101", "EM102"]
