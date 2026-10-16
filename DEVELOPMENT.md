@@ -41,7 +41,7 @@ Recommended approach for contributors. The devcontainer automatically creates a 
    ```
 
 3. Reopen in Container when prompted (VSCode will detect `.devcontainer.json`)
-   - Container automatically runs `scripts/setup --uv`
+   - Container automatically runs `scripts/setup --pip`
    - Creates `.venv/` and installs the locked root dependencies
 
 4. Start Home Assistant:
@@ -369,7 +369,7 @@ Airbeld. Signing in with a dedicated test account and seeing staging sensors is
 an **owner-only manual check**. Do not store credentials or tokens in this repo
 or evidence. Persistent HA state lives in its named volume; `down` retains it.
 
-The VS Code devcontainer uses Python 3.14. `scripts/setup --uv` installs the
+The VS Code devcontainer uses Python 3.14. `scripts/setup --pip` installs the
 locked root environment; `scripts/develop` is the older host-native runner.
 Container commands above are preferred for isolated state.
 
