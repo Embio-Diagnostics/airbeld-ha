@@ -73,7 +73,11 @@ async def async_setup_entry(
         for device_id, device_data in (coordinator.data or {}).items():
             if device_id not in coordinator.inventory:
                 continue
-            for sensor_name, metric_data in device_data["telemetry"].items():
+            metrics = {
+                **device_data["telemetry"],
+                **device_data.get("descriptors", {}),
+            }
+            for sensor_name, metric_data in metrics.items():
                 identity = (device_id, sensor_name)
                 if identity in added:
                     continue
@@ -190,7 +194,9 @@ class AirbeldSensor(CoordinatorEntity[AirbeldDataUpdateCoordinator], SensorEntit
         device_data = self.coordinator.data.get(self._device_id)
         if device_data:
             telemetry = device_data.get("telemetry", {})
-            metric_data = telemetry.get(self._sensor_name)
+            metric_data = device_data.get("descriptors", {}).get(
+                self._sensor_name
+            ) or telemetry.get(self._sensor_name)
 
             # Add description if available
             if (
@@ -215,5 +221,8 @@ class AirbeldSensor(CoordinatorEntity[AirbeldDataUpdateCoordinator], SensorEntit
 
         device = device_data.get("device")
         return bool(
-            device and device.status == "online" and not getattr(device, "stale", False)
+            device
+            and device.status == "online"
+            and not getattr(device, "stale", False)
+            and self.native_value is not None
         )

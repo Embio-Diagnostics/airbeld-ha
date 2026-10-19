@@ -404,7 +404,12 @@ async def test_old_duplicate_reverse_setup_order(hass, coordinator):
         assert not await async_setup_entry(hass, later)
         assert forward.await_count == 0
         assert validate.await_count == 0
-        assert len(coordinator.test_requests) == 2
+        assert len(coordinator.test_requests) == 3
+        assert [request.url.path for request in coordinator.test_requests] == [
+            "/api/v2/devices/",
+            "/api/v2/readings/batch/",
+            "/api/v2/devices/device-42/",
+        ]
         assert (
             er.async_get(hass).async_get(rows[0].entity_id).unique_id
             == rows[0].unique_id

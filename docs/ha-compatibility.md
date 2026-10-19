@@ -68,6 +68,15 @@ public-PyPI installation. No production deployment is part of this packet.
 - Known sensors use translated entity names, measurement state classes and native
   units. Local metadata checks verify `brand/icon.png` and `brand/logo.png` PNGs;
   these checks are not upstream HACS validation.
+- Devices without readings discover sensors from the v2 device detail response.
+  Descriptors are cached per entry and uid, including successful empty lists, until
+  the inventory type changes, removal is confirmed, or the entry unloads. Failed
+  detail requests and null lists retry on a later poll without failing otherwise
+  successful inventory/readings updates. Telemetry-only metrics still appear.
+- Sensors without a non-null value show unavailable, including online, non-stale
+  devices. When readings arrive (including zero), the existing entities gain values
+  without changing their IDs, names, classes or units. Type changes can add sensors
+  but do not remove existing entities merely because a descriptor disappears.
 
 ## Validation
 

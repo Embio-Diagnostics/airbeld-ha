@@ -51,6 +51,7 @@ class AirbeldDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.inventory: dict[str, Any] = {}
         self.absences: dict[str, int] = {}
         self.removal_generation: dict[str, int] = {}
+        self.sensor_descriptors: dict[str, tuple[str | None, dict[str, Any]]] = {}
         super().__init__(
             hass,
             _LOGGER,
@@ -80,7 +81,42 @@ class AirbeldDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 raise ConfigEntryAuthFailed(AUTH_REQUIRED) from err
             raise UpdateFailed(API_UNAVAILABLE) from err
 
-        data = {device.uid: {"device": device, "telemetry": {}} for device in devices}
+        data = {}
+        for device in devices:
+            cached = self.sensor_descriptors.get(device.uid)
+            if cached is None or cached[0] != device.type:
+                # A changed type invalidates even a previously successful list.
+                self.sensor_descriptors.pop(device.uid, None)
+                try:
+                    detail = await self.client.device(device.uid)
+                except AirbeldError:
+                    # Detail discovery is optional: inventory and batch requests
+                    # above alone determine auth/update failure and absences.
+                    _LOGGER.debug("Sensor discovery failed; retrying on a later poll")
+                else:
+                    if detail.sensors is not None:
+                        self.sensor_descriptors[device.uid] = (
+                            device.type,
+                            {
+                                sensor.name: {
+                                    "display_name": (
+                                        sensor.display_name.root
+                                        if sensor.display_name is not None
+                                        else None
+                                    )
+                                    or sensor.name,
+                                    "unit": sensor.unit,
+                                    "description": sensor.description,
+                                }
+                                for sensor in detail.sensors
+                            },
+                        )
+            cached = self.sensor_descriptors.get(device.uid)
+            data[device.uid] = {
+                "device": device,
+                "telemetry": {},
+                "descriptors": cached[1] if cached is not None else {},
+            }
         for reading in readings:
             if reading.uid not in data or reading.status != "ok":
                 continue
@@ -88,15 +124,16 @@ class AirbeldDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 samples = [
                     sample for sample in metric.values if sample.value is not None
                 ]
-                if samples:
-                    data[reading.uid]["telemetry"][key] = {
-                        "value": max(
-                            samples, key=lambda sample: sample.timestamp
-                        ).value,
-                        "display_name": metric.display_name or metric.name,
-                        "unit": metric.unit,
-                        "description": metric.description,
-                    }
+                data[reading.uid]["telemetry"][key] = {
+                    "value": (
+                        max(samples, key=lambda sample: sample.timestamp).value
+                        if samples
+                        else None
+                    ),
+                    "display_name": metric.display_name or metric.name,
+                    "unit": metric.unit,
+                    "description": metric.description,
+                }
         return data
 
     def _reconcile_inventory(self, devices: list[Any]) -> None:  # noqa: PLR0912 — keep inventory counting and entry-scoped cleanup together
@@ -150,6 +187,7 @@ class AirbeldDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         entities.async_remove(entity.entity_id)
                 registry.async_remove_device(row.id)
             del self.absences[uid]
+            self.sensor_descriptors.pop(uid, None)
             self.removal_generation[uid] = self.removal_generation.get(uid, 0) + 1
         # Initial legacy setup must let migration rewrite the old row first.
         # Subsequent inventories create rows even when telemetry repeatedly fails

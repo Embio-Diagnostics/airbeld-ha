@@ -28,6 +28,7 @@ from pytest_homeassistant_custom_component.components.recorder.common import (
 from custom_components.airbeld.const import DOMAIN
 from custom_components.airbeld.diagnostics import async_get_config_entry_diagnostics
 from custom_components.airbeld.identity import device_identifier, sensor_unique_id
+from custom_components.airbeld.sensor import AirbeldSensor
 from tests import test_upgrade
 from tests.test_upgrade import seed
 
@@ -451,3 +452,271 @@ async def test_pm4_keeps_registry_and_statistic(
     assert hass.states.get(old.entity_id).attributes["unit_of_measurement"] == "μg/m³"
     after = await hass.async_add_executor_job(get_metadata, hass)
     assert after[old.entity_id] == before[old.entity_id]
+
+
+def detail_requests(coordinator):
+    """Count actual SDK detail requests, excluding the inventory endpoint."""
+    return [
+        request.url.path
+        for request in coordinator.test_requests
+        if request.url.path.startswith("/api/v2/devices/")
+        and request.url.path != "/api/v2/devices/"
+    ]
+
+
+def sensor_rows(hass, entry):
+    return er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
+
+
+@pytest.fixture
+def descriptors(coordinator):
+    sensors = [
+        {"name": "temperature", "displayName": "Server temperature", "unit": "°C"},
+        {"name": "humidity", "displayName": "Server humidity", "unit": "%"},
+        {"name": "voc", "displayName": "Server VOC", "unit": None},
+        {"name": "nox", "displayName": "Server NOx", "unit": "-"},
+        {"name": "custom", "displayName": "Custom measurement", "unit": None},
+        {"name": "unnamed", "displayName": "", "unit": None},
+    ]
+    for sensor in sensors:
+        sensor["description"] = f"Description of {sensor['name']}"
+    coordinator.test_details["device-42"] = {"sensors": sensors}
+    return sensors
+
+
+async def test_descriptors_without_readings_keep_identity_when_values_arrive(
+    hass, coordinator, descriptors
+):
+    coordinator.test_inventory[0].update(status="online", stale=False)
+    coordinator.test_payload["results"] = []
+    current = await load(hass, coordinator)
+    rows = sensor_rows(hass, current.entry)
+    assert len(rows) == len(descriptors)
+    before = {}
+    expected_names = {
+        "temperature": "Kitchen Temperature",
+        "humidity": "Kitchen Humidity",
+        "voc": "Kitchen VOC index",
+        "nox": "Kitchen NOx index",
+        "custom": "Kitchen Custom measurement",
+        "unnamed": "Kitchen unnamed",
+    }
+    for sensor in descriptors:
+        key = sensor["name"]
+        identity_key = f"{key}_index" if key in ("voc", "nox") else key
+        unique_id = sensor_unique_id(
+            current.environment, current.subject, "device-42", identity_key
+        )
+        row = next(row for row in rows if row.unique_id == unique_id)
+        state = hass.states.get(row.entity_id)
+        assert state.state == "unavailable"
+        assert state.name == expected_names[key]
+        assert state.attributes.get("device_class") == (
+            key if key in ("temperature", "humidity") else None
+        )
+        assert state.attributes.get("unit_of_measurement") == (
+            sensor["unit"] if sensor["unit"] != "-" else None
+        )
+        entity = AirbeldSensor(
+            current,
+            "device-42",
+            current.inventory["device-42"],
+            key,
+            current.data["device-42"]["descriptors"][key],
+        )
+        assert entity.extra_state_attributes == {"description": sensor["description"]}
+        before[key] = (row.unique_id, row.entity_id, state.name, dict(state.attributes))
+    coordinator.test_payload["results"] = [
+        {
+            "uid": "device-42",
+            "status": "ok",
+            "sensors": {
+                sensor["name"]: {
+                    **sensor,
+                    "unit": sensor["unit"] or "",
+                    "aggregates": {"avg": 0, "max": 0},
+                    "descriptionEl": None,
+                    "values": [{"timestamp": "2026-10-15T12:00:00Z", "value": 0}],
+                }
+                for sensor in descriptors
+            },
+        }
+    ]
+    await current.async_refresh()
+    await hass.async_block_till_done()
+    assert len(sensor_rows(hass, current.entry)) == len(rows)
+    for key, (unique_id, entity_id, name, attributes) in before.items():
+        assert er.async_get(hass).async_get(entity_id).unique_id == unique_id
+        state = hass.states.get(entity_id)
+        assert float(state.state) == 0
+        assert state.name == name
+        assert state.attributes == {
+            **attributes,
+            "description": f"Description of {key}",
+        }
+
+
+async def test_partial_and_null_readings_include_telemetry_only_metrics(
+    hass, coordinator, descriptors
+):
+    metrics = coordinator.test_payload["results"][0]["sensors"]
+    metrics["humidity"] = {
+        **metrics["temperature"],
+        **descriptors[1],
+        "values": [{"timestamp": "2026-10-15T12:00:00Z", "value": None}],
+    }
+    metrics["telemetry_only"] = {
+        **metrics["temperature"],
+        "name": "telemetry_only",
+        "displayName": "Telemetry only",
+        "unit": "",
+        "values": [{"timestamp": "2026-10-15T12:00:00Z", "value": None}],
+    }
+    current = await load(hass, coordinator)
+    rows = sensor_rows(hass, current.entry)
+    assert len(rows) == len(descriptors) + 1
+    for row in rows:
+        state = hass.states.get(row.entity_id)
+        assert state.state == (
+            "23.5" if json.loads(row.unique_id)[-1] == "temperature" else "unavailable"
+        )
+    for metric in metrics.values():
+        for sample in metric["values"]:
+            sample["value"] = None
+    await current.async_refresh()
+    await hass.async_block_till_done()
+    assert all(hass.states.get(row.entity_id).state == "unavailable" for row in rows)
+
+
+async def test_descriptor_cache_new_device_type_change_and_empty_list(
+    hass, coordinator
+):
+    current = await load(hass, coordinator)
+    original = sensor_rows(hass, current.entry)[0]
+    coordinator.test_requests.clear()
+    await current.async_refresh()
+    await current.async_refresh()
+    assert detail_requests(coordinator) == []
+    coordinator.test_inventory.append(
+        {
+            "uid": "empty",
+            "name": "Empty",
+            "displayName": "Empty",
+            "status": "online",
+            "type": "EOS",
+        }
+    )
+    await current.async_refresh()
+    assert detail_requests(coordinator) == ["/api/v2/devices/empty/"]
+    await current.async_refresh()
+    assert detail_requests(coordinator) == ["/api/v2/devices/empty/"]
+    coordinator.test_inventory[0]["type"] = "Athena"
+    coordinator.test_details["device-42"] = {
+        "sensors": [{"name": "humidity", "displayName": "Humidity", "unit": "%"}]
+    }
+    coordinator.test_payload["results"] = []
+    await current.async_refresh()
+    await hass.async_block_till_done()
+    assert detail_requests(coordinator) == [
+        "/api/v2/devices/empty/",
+        "/api/v2/devices/device-42/",
+    ]
+    rows = sensor_rows(hass, current.entry)
+    assert len(rows) == 2
+    assert (
+        er.async_get(hass).async_get(original.entity_id).unique_id == original.unique_id
+    )
+    assert all(hass.states.get(row.entity_id).state == "unavailable" for row in rows)
+    await current.async_refresh()
+    assert len(detail_requests(coordinator)) == 2
+
+
+@pytest.mark.parametrize("first_detail", [401, 503, {"sensors": None}])
+async def test_descriptor_failure_or_null_retries_without_failing_inventory(
+    hass, coordinator, first_detail
+):
+    coordinator.test_details["device-42"] = first_detail
+    coordinator.test_requests.clear()
+    current = await load(hass, coordinator)
+    assert current.last_update_success
+    assert current.absences == {"device-42": 0}
+    assert current.removal_generation == {}
+    assert len(sensor_rows(hass, current.entry)) == 1  # telemetry still discovers
+    assert detail_requests(coordinator) == ["/api/v2/devices/device-42/"]
+    coordinator.test_details["device-42"] = {
+        "sensors": [{"name": "humidity", "displayName": "Humidity", "unit": "%"}]
+    }
+    await current.async_refresh()
+    await hass.async_block_till_done()
+    assert current.last_update_success
+    assert current.absences == {"device-42": 0}
+    assert len(sensor_rows(hass, current.entry)) == 2
+    assert detail_requests(coordinator) == ["/api/v2/devices/device-42/"] * 2
+    await current.async_refresh()
+    assert len(detail_requests(coordinator)) == 2
+
+
+async def test_descriptor_cache_evicted_only_on_confirmed_removal(hass, coordinator):
+    current = await load(hass, coordinator)
+    device = coordinator.test_inventory.pop()
+    coordinator.test_requests.clear()
+    for _ in range(2):
+        await current.async_refresh()
+    coordinator.test_inventory.append(device)
+    await current.async_refresh()
+    assert detail_requests(coordinator) == []
+    coordinator.test_inventory.clear()
+    for _ in range(3):
+        await current.async_refresh()
+    assert current.sensor_descriptors == {}
+    assert current.removal_generation == {"device-42": 1}
+    coordinator.test_inventory.append(device)
+    await current.async_refresh()
+    await hass.async_block_till_done()
+    assert detail_requests(coordinator) == ["/api/v2/devices/device-42/"]
+    assert len(sensor_rows(hass, current.entry)) == 1
+
+
+async def test_descriptor_caches_are_entry_owned_and_cleared_on_unload(
+    hass, coordinator
+):
+    coordinator.test_payload["results"] = []
+    current = await load(hass, coordinator)
+    original = sensor_rows(hass, current.entry)[0]
+    coordinator.test_details["device-42"] = {
+        "sensors": [{"name": "humidity", "displayName": "Humidity", "unit": "%"}]
+    }
+    sibling = MockConfigEntry(
+        domain=DOMAIN, version=2, data={**current.entry.data, "sub": "auth0|sibling"}
+    )
+    sibling.add_to_hass(hass)
+    coordinator.test_requests.clear()
+    with patch(
+        "custom_components.airbeld.get_async_client",
+        return_value=coordinator.test_shared,
+    ):
+        assert await hass.config_entries.async_setup(sibling.entry_id)
+        await hass.async_block_till_done()
+    other = sibling.runtime_data
+    assert detail_requests(coordinator) == ["/api/v2/devices/device-42/"]
+    await current.async_refresh()
+    await other.async_refresh()
+    await hass.async_block_till_done()
+    assert len(detail_requests(coordinator)) == 1
+    assert [row.unique_id for row in sensor_rows(hass, current.entry)] == [
+        original.unique_id
+    ]
+    sibling_rows = sensor_rows(hass, sibling)
+    assert len(sibling_rows) == 1
+    assert sibling_rows[0].unique_id == sensor_unique_id(
+        other.environment, other.subject, "device-42", "humidity"
+    )
+    assert sibling_rows[0].device_id != original.device_id
+    assert current.sensor_descriptors is not other.sensor_descriptors
+    assert await hass.config_entries.async_unload(sibling.entry_id)
+    assert other.sensor_descriptors == {}
+    assert current.sensor_descriptors
+    assert await hass.config_entries.async_unload(current.entry.entry_id)
+    assert current.sensor_descriptors == {}
+    await load(hass, coordinator)
+    assert len(detail_requests(coordinator)) == 2

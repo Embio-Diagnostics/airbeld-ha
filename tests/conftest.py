@@ -58,6 +58,18 @@ async def coordinator(hass, payload):
             "status": "online",
         }
     ]
+    details = {
+        "device-42": {
+            "sensors": [
+                {
+                    "name": "temperature",
+                    "displayName": "Temperature",
+                    "unit": "°C",
+                    "description": "Ambient temperature",
+                }
+            ]
+        }
+    }
 
     def respond(request):
         assert request.url.host == "backend.invalid"
@@ -66,6 +78,15 @@ async def coordinator(hass, payload):
             return httpx.Response(200, json=inventory)
         if request.url.path == "/api/v2/readings/batch/":
             return httpx.Response(200, json=payload)
+        for device in inventory:
+            if request.url.path == f"/api/v2/devices/{device['uid']}/":
+                detail = details.get(device["uid"], {"sensors": []})
+                if isinstance(detail, int):
+                    return httpx.Response(detail, json={"detail": "unavailable"})
+                return httpx.Response(
+                    200,
+                    json={"displayName": device["name"], **device, **detail},
+                )
         if request.url.path == "/api/v2/integrations/legacy-device-ids/resolve":
             return httpx.Response(200, json=[{"id": 42, "uid": "device-42"}])
         message = f"Unexpected endpoint {request.url.path}"
@@ -95,6 +116,7 @@ async def coordinator(hass, payload):
     result.test_inventory = inventory
     result.test_shared = shared
     result.test_payload = payload
+    result.test_details = details
     entry.runtime_data = result
     yield result
     await shared.aclose()
