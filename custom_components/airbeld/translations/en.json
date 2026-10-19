@@ -3,12 +3,36 @@
     "step": {
       "pick_implementation": {
         "title": "Airbeld Authentication"
+      },
+      "reauth_confirm": {
+        "title": "Sign in to Airbeld again",
+        "description": "Sign in with the same account originally used for this integration. Your devices and sensors will be retained."
       }
     },
     "abort": {
       "already_configured": "Account is already configured",
       "missing_configuration": "Authentication setup failed. Please restart Home Assistant and try again.",
-      "oauth_error": "Authentication failed. Please try again or check your Airbeld account credentials."
+      "oauth_error": "Authentication failed. Please try again or check your Airbeld account credentials.",
+      "cannot_connect": "The identity service is unavailable. Please try again later.",
+      "wrong_account": "Sign in with the original Airbeld account. A different account cannot replace this integration.",
+      "reauth_successful": "Reauthentication was successful."
+    }
+  },
+  "issues": {
+    "duplicate_account": {
+      "title": "Duplicate Airbeld account",
+      "description": "This account is already configured in the same environment. Only the oldest integration entry is loaded. Remove the later duplicate entry from Devices & services."
+    },
+    "unresolved_legacy": {
+      "title": "Legacy Airbeld devices could not be resolved",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Remove unresolved legacy devices?",
+            "description": "Legacy device IDs {ids} are no longer visible to this account. Remove this entry's unresolved devices and sensors from the registries? Cancel to retain them unavailable. Existing recorder history is not deleted."
+          }
+        }
+      }
     }
   },
   "options": {

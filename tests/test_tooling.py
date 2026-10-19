@@ -4,23 +4,27 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from unittest.mock import AsyncMock
 
+import httpx
 import pytest
 import yaml
+from homeassistant.config_entries import ConfigEntryState
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.airbeld import async_setup_entry
+from custom_components.airbeld.config_flow import OAuth2FlowHandler
+from custom_components.airbeld.const import DOMAIN
 from scripts import dev_bootstrap
 
 
 @pytest.mark.parametrize("mode", ["local", "staging"])
-def test_dev_bootstrap_routing(monkeypatch, mode):
+async def test_dev_bootstrap_routing(hass, monkeypatch, mode):
     """The real bootstrap selects only the requested origin before HA starts."""
     monkeypatch.setenv("AIRBELD_DEV_MODE", mode)
     monkeypatch.setattr(Path, "exists", lambda self: True)
     monkeypatch.setattr(
         dev_bootstrap.const, "DEFAULT_API_BASE", "https://api.airbeld.com"
-    )
-    monkeypatch.setattr(
-        dev_bootstrap.integration, "DEFAULT_API_BASE", "https://api.airbeld.com"
     )
     calls = []
     monkeypatch.setattr(
@@ -37,9 +41,46 @@ def test_dev_bootstrap_routing(monkeypatch, mode):
             "https://airbeld-staging-api-fmb3htfqfua5hhgk.westeurope-01.azurewebsites.net"
         )
     )
-    assert expected == dev_bootstrap.integration.DEFAULT_API_BASE
     assert calls == [(("homeassistant",), {"run_name": "__main__"})]
     assert sys.argv == ["hass", "--config", "/config"]
+
+    # Bootstrap starts HA without supplying credentials; onboarding selects and
+    # persists the origin through the flow's real environment resolver.
+    flow = OAuth2FlowHandler()
+    flow.hass = hass
+    flow.context = {"source": "user"}
+    monkeypatch.setattr(
+        "custom_components.airbeld.config_flow.async_subject",
+        AsyncMock(return_value="auth0|dev"),
+    )
+    result = await flow.async_oauth_create_entry(
+        {
+            "auth_implementation": DOMAIN,
+            "token": {"access_token": "onboarding-only", "expires_at": 9999999999},
+        }
+    )
+    assert result["data"]["environment"] == expected
+    entry = MockConfigEntry(domain=DOMAIN, version=2, data=result["data"])
+    entry.add_to_hass(hass)
+    object.__setattr__(entry, "state", ConfigEntryState.SETUP_IN_PROGRESS)
+    requests = []
+
+    def respond(request):
+        assert str(request.url).startswith(expected + "/")
+        requests.append(request)
+        assert request.url.path == "/api/v2/devices/"
+        return httpx.Response(200, json=[])
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as shared:
+        monkeypatch.setattr(
+            "custom_components.airbeld.get_async_client", lambda _hass: shared
+        )
+        monkeypatch.setattr(
+            hass.config_entries, "async_forward_entry_setups", AsyncMock()
+        )
+        assert await async_setup_entry(hass, entry)
+        assert entry.runtime_data.client.base_url.rstrip("/") == expected + "/api/v2"
+        assert len(requests) == 1
 
 
 def test_dev_bootstrap_rejects_unknown(monkeypatch):

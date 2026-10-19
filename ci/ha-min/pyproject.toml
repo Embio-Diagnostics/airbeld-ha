@@ -1,15 +1,18 @@
 [project]
 name = "airbeld-ha-min-tests"
 version = "0.0.0"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.13.2,<3.14"
 dependencies = [
-  "homeassistant==2024.6.0",
-  "pytest-homeassistant-custom-component==0.13.132",
-  "airbeld-api-sdk==0.4.0",
-  "josepy==1.14.0",
+  "homeassistant==2025.10.0",
+  "pytest-homeassistant-custom-component==0.13.285",
+  "airbeld-api-sdk==1.0.0",
+  # aiodns 3.5.0 imports the result classes removed in pycares 5.
+  "pycares==4.11.0",
 ]
 
 [tool.uv]
 package = false
-# Test-only compatibility experiment, not a supported runtime installation.
-override-dependencies = ["httpx==0.27.0", "pydantic>=2.12.2"]
+prerelease = "allow"
+
+[tool.uv.sources]
+airbeld-api-sdk = {path = "../../vendor/wheels/airbeld_api_sdk-1.0.0-py3-none-any.whl"}

@@ -20,7 +20,7 @@ version = "0.1.0"
 
 # Runtime dependencies (what the integration needs when running in HA)
 dependencies = [
-  "airbeld-api-sdk>=0.4.0",
+  "airbeld-api-sdk==1.0.0",
 ]
 
 [project.urls]
@@ -38,6 +38,9 @@ dev = [
 
 [tool.uv]
 package = false
+
+[tool.uv.sources]
+airbeld-api-sdk = {path = "vendor/wheels/airbeld_api_sdk-1.0.0-py3-none-any.whl"}
 
 [tool.uv.dependency-groups]
 dev = {requires-python = ">=3.14.2"}

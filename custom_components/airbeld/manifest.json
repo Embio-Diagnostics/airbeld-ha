@@ -11,7 +11,7 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/Embio-Diagnostics/airbeld-ha/issues",
   "requirements": [
-    "airbeld-api-sdk>=0.4.0"
+    "airbeld-api-sdk==1.0.0"
   ],
   "version": "0.1.2"
 }

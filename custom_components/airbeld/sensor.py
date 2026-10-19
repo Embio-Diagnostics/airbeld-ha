@@ -15,17 +15,18 @@ if TYPE_CHECKING:
 
 from .const import DOMAIN, SENSOR_DEVICE_CLASSES
 from .coordinator import AirbeldDataUpdateCoordinator
+from .identity import device_identifier, sensor_unique_id
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
+    _hass: HomeAssistant,
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Airbeld sensors."""
-    coordinator: AirbeldDataUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
+    coordinator: AirbeldDataUpdateCoordinator = config_entry.runtime_data
 
     entities = []
 
@@ -69,7 +70,12 @@ class AirbeldSensor(CoordinatorEntity[AirbeldDataUpdateCoordinator], SensorEntit
 
         # Entity attributes - use SDK's display_name
         # Don't include device name in entity name - HA automatically prepends it
-        self._attr_unique_id = f"airbeld_{device_id}_{sensor_name}"
+        self._attr_unique_id = sensor_unique_id(
+            coordinator.environment, coordinator.subject, device_id, sensor_name
+        )
+        for legacy in coordinator.entry.data.get("legacy_voc_nox", {}).values():
+            if legacy["uid"] == device_id and legacy["sensor"] == sensor_name:
+                self._attr_unique_id = legacy["unique_id"]
         self._attr_name = metric_data["display_name"]
 
         # Sensor configuration from SDK metadata
@@ -93,7 +99,16 @@ class AirbeldSensor(CoordinatorEntity[AirbeldDataUpdateCoordinator], SensorEntit
             device_model = f"{device_model or ''} {self._device.type}".strip()
 
         return {
-            "identifiers": {(DOMAIN, self._device_id)},
+            "identifiers": {
+                (
+                    DOMAIN,
+                    device_identifier(
+                        self.coordinator.environment,
+                        self.coordinator.subject,
+                        self._device_id,
+                    ),
+                )
+            },
             "name": device_name,
             "manufacturer": "Airbeld",
             "model": device_model,
@@ -153,6 +168,5 @@ class AirbeldSensor(CoordinatorEntity[AirbeldDataUpdateCoordinator], SensorEntit
         if device and hasattr(device, "status"):
             return device.status != "offline"
 
-        # Default to available if we have data
-        # (async_get_all_readings_by_date only returns online devices)
+        # Retain initial availability policy; telemetry-level corrections are task 22.
         return True

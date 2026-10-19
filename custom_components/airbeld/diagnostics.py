@@ -8,14 +8,12 @@ if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
-
 
 async def async_get_config_entry_diagnostics(
-    hass: HomeAssistant, entry: ConfigEntry
+    _hass: HomeAssistant, entry: ConfigEntry
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
 
     # Get coordinator data
     data = coordinator.data
@@ -37,6 +35,7 @@ async def async_get_config_entry_diagnostics(
             "update_interval": str(coordinator.update_interval),
         },
         "devices": {},
+        "unresolved_legacy": entry.data.get("unresolved_legacy", []),
     }
 
     # Add device information (redact sensitive fields)
@@ -46,7 +45,7 @@ async def async_get_config_entry_diagnostics(
 
         diagnostics_data["devices"][device_id] = {
             "device_info": {
-                "id": device.id,
+                "uid": device.uid,
                 "name": device.name,
                 "status": getattr(device, "status", "unknown"),
                 "model": getattr(device, "model", None),

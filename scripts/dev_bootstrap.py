@@ -5,7 +5,6 @@ import runpy
 import sys
 from pathlib import Path
 
-import custom_components.airbeld as integration
 from custom_components.airbeld import const
 
 
@@ -19,7 +18,6 @@ def main() -> None:
         config.write_text("default_config:\n", encoding="utf-8")
     if mode == "staging":
         const.DEFAULT_API_BASE = "https://airbeld-staging-api-fmb3htfqfua5hhgk.westeurope-01.azurewebsites.net"
-        integration.DEFAULT_API_BASE = const.DEFAULT_API_BASE
     sys.argv = ["hass", "--config", "/config"]
     runpy.run_module("homeassistant", run_name="__main__")
 

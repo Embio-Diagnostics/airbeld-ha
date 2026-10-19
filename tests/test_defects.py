@@ -7,7 +7,6 @@ import pytest
 from homeassistant import config_entries
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.helpers import config_entry_oauth2_flow
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.airbeld import async_setup_entry
 from custom_components.airbeld.config_flow import (
@@ -19,16 +18,17 @@ from custom_components.airbeld.sensor import AirbeldSensor
 from custom_components.airbeld.sensor import async_setup_entry as setup_sensors
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="H1: no entry identity")
 async def test_h1_entry_unique_id(hass):
     flow = OAuth2FlowHandler()
     flow.hass = hass
     flow.context = {"source": config_entries.SOURCE_USER}
-    await flow.async_oauth_create_entry({"token": {"access_token": "test-only"}})
+    with patch(
+        "custom_components.airbeld.config_flow.async_subject", return_value="auth0|one"
+    ):
+        await flow.async_oauth_create_entry({"token": {"access_token": "test-only"}})
     assert flow.unique_id is not None
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="H2: no reauth flow")
 async def test_h2_reauth(hass):
     flow = OAuth2FlowHandler()
     flow.hass = hass
@@ -38,7 +38,6 @@ async def test_h2_reauth(hass):
     assert result["type"] in {"form", "external"}
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="H3: fake PKCE")
 async def test_h3_pkce_authorization(hass):
     await async_register_implementation(hass)
     flow = OAuth2FlowHandler()
@@ -58,16 +57,9 @@ async def test_h3_pkce_authorization(hass):
     assert params.get("code_challenge"), "S256 without a challenge is not PKCE"
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="H4: no runtime_data")
 async def test_h4_runtime_data(hass, coordinator):
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        data={
-            "auth_implementation": DOMAIN,
-            "token": {"access_token": "test-only", "expires_at": 9999999999},
-        },
-    )
-    entry.add_to_hass(hass)
+    entry = coordinator.entry
+    entry.runtime_data = None
     await async_register_implementation(hass)
     with (
         patch(
@@ -92,10 +84,10 @@ async def test_h4_runtime_data(hass, coordinator):
 async def test_h5_entity_name(coordinator):
     sensor = AirbeldSensor(
         coordinator,
-        42,
-        coordinator.data[42]["device"],
+        "device-42",
+        coordinator.data["device-42"]["device"],
         "temperature",
-        coordinator.data[42]["telemetry"]["temperature"],
+        coordinator.data["device-42"]["telemetry"]["temperature"],
     )
     assert sensor.has_entity_name
 
@@ -104,17 +96,16 @@ async def test_h5_entity_name(coordinator):
     strict=True, raises=AssertionError, reason="H6: only first refresh creates entities"
 )
 async def test_h6_discover_after_refresh(hass, coordinator):
-    entry = MockConfigEntry(domain=DOMAIN)
-    hass.data[DOMAIN] = {entry.entry_id: coordinator}
+    entry = coordinator.entry
     entities = []
     await setup_sensors(hass, entry, lambda items, **kwargs: entities.extend(items))
     assert len(entities) == 1
     changed = dict(coordinator.data)
-    changed[84] = coordinator.data[42]
+    changed["device-84"] = coordinator.data["device-42"]
     coordinator.async_set_updated_data(changed)
     await hass.async_block_till_done()
     assert {entity.unique_id for entity in entities} == {
-        "airbeld_42_temperature",
+        entities[0].unique_id,
         "airbeld_84_temperature",
     }
 
@@ -127,8 +118,8 @@ async def test_h7_device_classes(coordinator):
     expected = getattr(SensorDeviceClass, "PM4", None)
     sensor = AirbeldSensor(
         coordinator,
-        42,
-        coordinator.data[42]["device"],
+        "device-42",
+        coordinator.data["device-42"]["device"],
         "pm4",
         {"display_name": "PM4", "unit": "µg/m³"},
     )

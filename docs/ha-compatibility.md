@@ -1,51 +1,67 @@
-# HA compatibility record — task 11
+# HA compatibility record — v2 candidate
 
-Newest stable resolved once from PyPI `homeassistant` release JSON during the
-initial H11 attempt (2026-10-15 UTC); the earlier attempt did not preserve the
-exact timestamp. PyPI stable-release selection was reconfirmed at
-**2026-10-15T23:35:36.328523Z**; this is a
-recording timestamp, not a fabricated original resolution time. The selected
-release is **2026.10.1**, per the orchestrator's correction decision. Stable
-selection excludes PEP 440 prereleases, development releases and yanked releases.
+The owner raised the minimum to **2025.10.0** on 2026-10-19. No compatibility
+shims are used. Users on older Home Assistant must keep **v0.1.2 (v1)**.
 
 | Environment | HA | Python | pytest HA plugin |
 |---|---|---|---|
-| Root (newest stable) | 2026.10.1 | 3.14 (executed 3.14.3; HA requires ≥3.14.2) | 0.13.372 |
-| `ci/ha-min` (floor) | 2024.6.0 | 3.12 (executed 3.12.12) | 0.13.132 |
+| Root (newest stable selected for this wave) | 2026.10.1 | 3.14 (executed 3.14.3; requires ≥3.14.2) | 0.13.372 |
+| `ci/ha-min` (floor) | 2025.10.0 | 3.13 (executed 3.13.12; requires ≥3.13.2) | 0.13.285 |
 
-The integration project's `requires-python = ">=3.13.2"` is unchanged. Root dev
-dependencies carry `requires-python >=3.14.2`; `.python-version` selects 3.14.
-The separate floor project imports the component source without installing the
-root project. This tests source compatibility, not root-project installability.
+The floor project imports the same component source without installing the root
+project. Its Python constraint is `>=3.13.2,<3.14`. The old test-only httpx and
+pydantic overrides and josepy 1.14.0 pin are removed: the floor's native httpx
+0.28.1, pydantic 2.11.9 and josepy 2.2.0 satisfy this environment.
+The floor additionally pins pycares 4.11.0: its aiodns 3.5.0 imports result
+classes removed in pycares 5. Without that transitive compatibility pin the
+floor's aiohttp import fails before tests can collect.
 
-## Boundary findings and owner choices
+Both HA versions provide `LocalOAuth2ImplementationWithPkce`,
+`httpx_client.get_async_client`, repairs and `ConfigEntry.runtime_data`. PM4
+first appears at this floor; entity-class corrections are the following task.
+Device and sensor identities include environment, Auth0 subject and device uid;
+each entry owns its own device rows on both HA ends. No deprecated device-registry
+add/remove-config-entry arguments are used.
 
-| API needed by tasks 21/22 | HA 2024.6.0 | HA 2026.10.1 | Follow-up |
-|---|---|---|---|
-| `LocalOAuth2ImplementationWithPkce` | absent | present | Owner: implement a floor shim generating verifier/challenge and token exchange, or raise minimum to a release supplying it. Current component uses non-PKCE implementation at both ends (H3). |
-| `httpx_client.get_async_client` | present | present | Use HA helper; no shim needed. |
-| `SensorDeviceClass.PM4` | absent | present | Owner: floor shim uses no PM4 class (never PM10), or raise minimum to a release supplying PM4. |
-| `issue_registry.async_create_issue` (repairs) | present | present | Repair plumbing is available at both ends. |
-| `ConfigEntry.runtime_data` | available | available | Current component still uses `hass.data` (H4). |
+## SDK artifact and release installation
 
-No supported minimum is changed by this record. Missing floor APIs remain an
-owner decision for tasks 21/22, not a guessed version-policy change.
+Both uv projects pin the real **airbeld-api-sdk 1.0.0 candidate** by wheel path
+and lockfile SHA256 under `vendor/wheels/`:
+`b001f608d7c729056a27a40a031726a9255803f5ffb0cf39c83241ae15a2a8d3`.
+CI and development preinstall this wheel. The HA manifest names
+`airbeld-api-sdk==1.0.0`; HACS installs it from **PyPI at the coordinated release
+(task 35)**, when this exact artifact is published. The candidate is not yet a
+public-PyPI installation. No production deployment is part of this packet.
 
-### SDK 0.4.0 floor incompatibility
+## Upgrade changelog
 
-SDK metadata requires `httpx>=0.28.1`, `pydantic>=2.11.7`, `tenacity>=9.1.2`.
-HA 2024.6 pins httpx 0.27.0. The floor test project explicitly overrides httpx
-to 0.27.0 and uses a current pydantic (old pydantic broke this SDK's import).
-It also pins josepy 1.14.0: acme 2.10.0 references `josepy.ComparableX509`, removed
-in josepy 2. These are **test-environment compatibility overrides**, not evidence
-that unmodified SDK metadata installs on HA 2024.6. The real SDK HTTP/parser path
-passes the characterization tests under the override. Owner options: a
-floor-compatible SDK requirement/artifact, or an explicit supported-floor change.
-Tasks 21/22 must resolve this before claiming the advertised installation range.
+- Users on Home Assistant older than 2025.10.0 keep **v0.1.2 (v1)**.
+- Version-1 config entries bump to version 2 immediately. Registry completion
+  waits for authenticated v2 inventory and the SDK legacy-id resolver, not the
+  inventory's `legacyId` field. A journal and per-id completion markers allow
+  interrupted rewrites to resume without recreating entities.
+  HA's delayed storage writes are flushed in order: source journal, device and
+  entity registries, then each completion marker. HA exposes no public immediate
+  config-entry/registry flush, so the narrowly scoped storage calls are tested
+  on both supported ends.
+- Ordinary entity IDs, names, areas, disabled state and recorder history are
+  preserved by updating unique IDs and device identifiers on the existing rows.
+  VOC/NOx rows retain their original unique IDs and record the resolved uid for
+  the next task's correction. That correction creates new index entities and
+  is the explicit exception to entity-ID preservation.
+- Unresolved legacy IDs remain untouched and unavailable, appear in diagnostics,
+  and are removable only through the user's repair confirmation.
+- Auth failures request reauthentication; backend failures retry setup. A different
+  subject cannot reauthenticate an existing entry. Duplicate accounts in the same
+  environment keep the oldest entry, ordered by creation time then entry ID.
+  Legacy subjects are recovered from Auth0 RS256 signatures with issuer and
+  audience verification. An expired signed token may bind the original account
+  identity, but never authorizes polling; fresh sign-ins use authenticated userinfo.
+- H1–H4 are fixed; H5–H7 remain strict expected failures until the entity task.
 
-## Validation evidence
+## Validation
 
-HA APIs were imported in both isolated offline environments; characterization
-and strict defects executed against both. Exact command outputs are in run
-`smarthome-w4-oct16/results/H11-*`. The full repository gate remains the lane
-harness's responsibility. H1–H7 are deliberately not fixed here.
+Targeted offline tests use the real candidate SDK with a fixture backend and
+seeded HA registries at both ends. Evidence lives in the run
+`smarthome-w6-oct19/results/HA1-*`. The full repository gate is the lane harness's
+responsibility; the live staging upgrade is task 32.

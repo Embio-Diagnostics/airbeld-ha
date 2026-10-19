@@ -267,18 +267,29 @@ wheels = [
 
 [[package]]
 name = "airbeld-api-sdk"
-version = "0.4.0"
-source = { registry = "https://pypi.org/simple" }
+version = "1.0.0"
+source = { path = "vendor/wheels/airbeld_api_sdk-1.0.0-py3-none-any.whl" }
 dependencies = [
     { name = "httpx" },
     { name = "pydantic", version = "2.12.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.14.2'" },
     { name = "pydantic", version = "2.13.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.14.2'" },
-    { name = "tenacity" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/86/80/20c3802b0d8e1535285939bf1c6b5a46ab528577d8814bb324ff031c21df/airbeld_api_sdk-0.4.0.tar.gz", hash = "sha256:c3b4b73d2af08e532f3687005e833c5ec5f80e742dac0ee74a34c6aff73a9982", size = 48181, upload-time = "2025-10-14T03:55:10.31Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4d/bf/784c0dcb447b43d358df94f5c396158525be0fcd6072ac3d3dcc2911ea8c/airbeld_api_sdk-0.4.0-py3-none-any.whl", hash = "sha256:17808f8933686599c1d87d04491d66f47df4966b679b60fd7b92b73675bf8765", size = 12044, upload-time = "2025-10-14T03:55:05.453Z" },
+    { filename = "airbeld_api_sdk-1.0.0-py3-none-any.whl", hash = "sha256:b001f608d7c729056a27a40a031726a9255803f5ffb0cf39c83241ae15a2a8d3" },
 ]
+
+[package.metadata]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10" },
+    { name = "pydantic", specifier = ">=2.11.7" },
+    { name = "pydantic", marker = "extra == 'dev'", specifier = ">=2.7" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.5" },
+]
+provides-extras = ["dev"]
 
 [[package]]
 name = "airbeld-ha"
@@ -296,7 +307,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "airbeld-api-sdk", specifier = ">=0.4.0" }]
+requires-dist = [{ name = "airbeld-api-sdk", path = "vendor/wheels/airbeld_api_sdk-1.0.0-py3-none-any.whl" }]
 
 [package.metadata.requires-dev]
 dev = [
@@ -3091,15 +3102,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/74/2c/8ffc1414d1951895d0d5b7dc83c0b079ebc48c3bf27ffbb0064646367500/syrupy-6.1.1.tar.gz", hash = "sha256:7e584a8df4ede6dd3c1c44a77f9edc46186b6767a73dea6f0083044946839a59", size = 109705, upload-time = "2026-09-13T20:25:21.599Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2c/b5/bf2a8a335a6a813869dd482cedbcde252f582b5afbfe50eb78ec09962800/syrupy-6.1.1-py3-none-any.whl", hash = "sha256:6ac9ac6a42d70ae44156f5f157a9563b9bb8cc96dcf9364327f330463bff889a", size = 63436, upload-time = "2026-09-13T20:25:20.294Z" },
-]
-
-[[package]]
-name = "tenacity"
-version = "9.1.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/0a/d4/2b0cd0fe285e14b36db076e78c93766ff1d529d70408bd1d2a5a84f1d929/tenacity-9.1.2.tar.gz", hash = "sha256:1169d376c297e7de388d18b4481760d478b0e99a777cad3a9c86e556f4b697cb", size = 48036, upload-time = "2025-04-02T08:25:09.966Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e5/30/643397144bfbfec6f6ef821f36f33e57d35946c44a2352d3c9f0ae847619/tenacity-9.1.2-py3-none-any.whl", hash = "sha256:f77bf36710d8b73a50b2dd155c97b870017ad21afe6ab300326b0371b3b05138", size = 28248, upload-time = "2025-04-02T08:25:07.678Z" },
 ]
 
 [[package]]

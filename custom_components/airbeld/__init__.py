@@ -1,116 +1,123 @@
-"""The Airbeld integration."""
+"""The airbeld integration, with entry-owned v2 runtime data."""
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
-from homeassistant.const import CONF_ACCESS_TOKEN, Platform
-from homeassistant.exceptions import ConfigEntryAuthFailed
+from aiohttp import ClientResponseError
+from homeassistant.const import Platform
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_entry_oauth2_flow
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers.httpx_client import get_async_client
 
 from airbeld import AirbeldClient
+
+from .config_flow import async_register_implementation
+from .const import DOMAIN
+from .coordinator import AirbeldDataUpdateCoordinator
+from .identity import account_id, async_legacy_subject, environment
+from .migration import async_complete_migration
+
+PLATFORMS = [Platform.SENSOR]
+ENTRY_VERSION = 2
+AUTH_SERVICE_UNAVAILABLE = "Token service unavailable"
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.typing import ConfigType
 
-from .const import (
-    DEFAULT_API_BASE,
-    DOMAIN,
-    OAUTH2_AUTHORIZE,
-    OAUTH2_CLIENT_ID,
-    OAUTH2_TOKEN,
-)
-from .coordinator import AirbeldDataUpdateCoordinator
-
-_LOGGER = logging.getLogger(__name__)
-
-PLATFORMS: list[Platform] = [Platform.SENSOR]
-
 
 async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
-    """Set up the Airbeld component."""
-    try:
-        # Register OAuth2 implementation with embedded credentials
-        config_entry_oauth2_flow.async_register_implementation(
-            hass,
-            DOMAIN,
-            config_entry_oauth2_flow.LocalOAuth2Implementation(
-                hass,
-                DOMAIN,
-                client_id=OAUTH2_CLIENT_ID,
-                client_secret=None,  # PKCE flow - no secret needed
-                authorize_url=OAUTH2_AUTHORIZE,
-                token_url=OAUTH2_TOKEN,
-            ),
-        )
-        _LOGGER.debug("OAuth2 implementation registered")
-    except Exception:
-        _LOGGER.exception("Failed to register OAuth2 implementation")
-        # Don't fail setup - the config flow will handle registration if needed
-
+    """Both startup and flow registration use the same real PKCE implementation."""
+    await async_register_implementation(hass)
     return True
 
 
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Bump immediately; registry completion waits for authenticated inventory."""
+    if entry.version == 1:
+        hass.config_entries.async_update_entry(
+            entry,
+            version=2,
+            data={
+                **entry.data,
+                "environment": environment(entry.data),
+                "migration_pending": True,
+            },
+        )
+    return entry.version == ENTRY_VERSION
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Airbeld from a config entry."""
-    # Get OAuth2 session for token management and refresh
+    """Set up the winning account entry and finish its registry migration."""
+    await async_register_implementation(hass)
     implementation = (
         await config_entry_oauth2_flow.async_get_config_entry_implementation(
             hass, entry
         )
     )
-
     session = config_entry_oauth2_flow.OAuth2Session(hass, entry, implementation)
-
+    env = environment(entry.data)
+    # Resolve original signed identities before token refresh/reauth can replace
+    # credentials. Selection and duplicate refusal below happen without an await.
+    for candidate in hass.config_entries.async_entries(DOMAIN):
+        if environment(candidate.data) == env and not candidate.data.get("sub"):
+            sub = await async_legacy_subject(
+                hass, candidate.data["token"]["access_token"]
+            )
+            hass.config_entries.async_update_entry(
+                candidate, data={**candidate.data, "environment": env, "sub": sub}
+            )
+    # Capture all legacy subjects before assigning any entry identity. No await
+    # occurs between winner selection and the duplicate return, so concurrent
+    # setup cannot let a later duplicate poll or rewrite the winner's rows.
+    sub = entry.data["sub"]
+    identity = account_id(env, sub)
+    peers = [
+        candidate
+        for candidate in hass.config_entries.async_entries(DOMAIN)
+        if environment(candidate.data) == env and candidate.data.get("sub") == sub
+    ]
+    winner = min(
+        peers, key=lambda candidate: (candidate.created_at, candidate.entry_id)
+    )
+    if winner is not entry:
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            f"duplicate_{entry.entry_id}",
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key="duplicate_account",
+        )
+        return False
     try:
         await session.async_ensure_token_valid()
     except ConfigEntryAuthFailed:
-        _LOGGER.exception("Token validation failed - authentication required")
         raise
-    except Exception:
-        _LOGGER.exception("Token validation failed")
-        return False
-
-    # Get the current access token
-    access_token = session.token[CONF_ACCESS_TOKEN]
-
-    # Create the Airbeld client in executor to avoid blocking I/O during SSL setup
-    def create_client() -> AirbeldClient:
-        """Create AirbeldClient with blocking operations in executor."""
-        return AirbeldClient(token=access_token, base_url=DEFAULT_API_BASE)
-
-    client = await hass.async_add_executor_job(create_client)
-
-    # Create the data coordinator with OAuth2 session for token refresh
-    coordinator = AirbeldDataUpdateCoordinator(hass, client, session)
-
-    # Fetch initial data so we have data when we create the entities
+    except ClientResponseError as err:
+        if err.status in (400, 401, 403):
+            raise ConfigEntryAuthFailed(AUTH_SERVICE_UNAVAILABLE) from err
+        raise ConfigEntryNotReady(AUTH_SERVICE_UNAVAILABLE) from err
+    except Exception as err:
+        raise ConfigEntryNotReady(AUTH_SERVICE_UNAVAILABLE) from err
+    hass.config_entries.async_update_entry(entry, unique_id=identity)
+    ir.async_delete_issue(hass, DOMAIN, f"duplicate_{entry.entry_id}")
+    client = AirbeldClient(
+        token=session.token["access_token"], base_url=env, client=get_async_client(hass)
+    )
+    coordinator = AirbeldDataUpdateCoordinator(hass, client, session, entry)
     await coordinator.async_config_entry_first_refresh()
-
-    # Store the coordinator in hass.data
-    hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = coordinator
-
-    # Set up platforms
+    await async_complete_migration(hass, entry, coordinator)
+    entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload a config entry."""
-    # Unload platforms
-    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        # Get coordinator and close client
-        coordinator = hass.data[DOMAIN].pop(entry.entry_id)
-        if hasattr(coordinator.client, "aclose"):
-            await coordinator.client.aclose()
-
-        # Clean up if this was the last entry
-        if not hass.data[DOMAIN]:
-            hass.data.pop(DOMAIN)
-
-    return unload_ok
+    """Unload platforms without closing HA's injected shared HTTP client."""
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)

@@ -1,18 +1,18 @@
 - id: H1
   owner_task: 21
-  state: unfixed
+  state: fixed
   test: tests/test_defects.py::test_h1_entry_unique_id
 - id: H2
   owner_task: 21
-  state: unfixed
+  state: fixed
   test: tests/test_defects.py::test_h2_reauth
 - id: H3
   owner_task: 21
-  state: unfixed
+  state: fixed
   test: tests/test_defects.py::test_h3_pkce_authorization
 - id: H4
   owner_task: 21
-  state: unfixed
+  state: fixed
   test: tests/test_defects.py::test_h4_runtime_data
 - id: H5
   owner_task: 22

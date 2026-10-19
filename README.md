@@ -61,12 +61,25 @@
 
 ## Requirements
 
-- Home Assistant 2024.6.0 or newer (test endpoints: 2024.6.0 and 2026.10.1;
-  see [compatibility limitations](docs/ha-compatibility.md))
+- Home Assistant 2025.10.0 or newer (test endpoints: 2025.10.0 and 2026.10.1;
+  see [compatibility record](docs/ha-compatibility.md))
 - Airbeld account with registered devices
 - Internet connection (cloud-based integration)
 
 ## Troubleshooting
+
+### Upgrading from v0.1.2
+- Older Home Assistant installations must keep v0.1.2 (the v1 integration).
+- The candidate uses API v2 and real PKCE sign-in. If asked to reauthenticate,
+  use the original account; signing in as another account is refused.
+- Ordinary sensors migrate in place: their entity IDs, custom names, areas,
+  disabled state and history remain. Unresolved legacy devices are left untouched
+  and unavailable; a repair offers explicit removal.
+- Different accounts each get their own device rows and sensors, including shared
+  devices. For duplicate entries of the same account/environment, only the oldest
+  loads; later entries get a repair notice.
+- The later VOC/NOx index correction creates new entities (an exception to entity-ID
+  preservation); this identity upgrade retains the original VOC/NOx rows.
 
 ### Integration not found after installation
 - Restart Home Assistant completely (not just reload integrations)

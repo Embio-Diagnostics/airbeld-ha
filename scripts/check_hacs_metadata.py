@@ -16,7 +16,7 @@ def main() -> None:
     hacs = json.loads((root / "hacs.json").read_text(encoding="utf-8"))
     component = root / "custom_components" / "airbeld"
     manifest = json.loads((component / "manifest.json").read_text(encoding="utf-8"))
-    require(hacs["homeassistant"] == "2024.6.0", "HACS floor differs")
+    require(hacs["homeassistant"] == "2025.10.0", "HACS floor differs")
     require(hacs["content_in_root"] is False, "HACS layout differs")
     require(hacs["render_readme"] is True, "HACS readme disabled")
     require(hacs["name"] == manifest["name"] == "Airbeld", "Name differs")
