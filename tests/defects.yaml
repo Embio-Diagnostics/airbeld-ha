@@ -16,13 +16,13 @@
   test: tests/test_defects.py::test_h4_runtime_data
 - id: H5
   owner_task: 22
-  state: unfixed
+  state: fixed
   test: tests/test_defects.py::test_h5_entity_name
 - id: H6
   owner_task: 22
-  state: unfixed
+  state: fixed
   test: tests/test_defects.py::test_h6_discover_after_refresh
 - id: H7
   owner_task: 22
-  state: unfixed
+  state: fixed
   test: tests/test_defects.py::test_h7_device_classes

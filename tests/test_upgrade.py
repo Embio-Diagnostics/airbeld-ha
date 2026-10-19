@@ -231,8 +231,12 @@ async def test_direct_upgrade_journal_resume_and_unresolved(hass, coordinator): 
         sensor_unique_id(
             coordinator.environment, coordinator.subject, "device-42", "temperature"
         ),
-        "airbeld_42_voc",
-        "airbeld_42_nox",
+        sensor_unique_id(
+            coordinator.environment, coordinator.subject, "device-42", "voc_index"
+        ),
+        sensor_unique_id(
+            coordinator.environment, coordinator.subject, "device-42", "nox_index"
+        ),
     }
     assert all(sensor.native_value is not None for sensor in sensors)
     before = dict(entry.data)

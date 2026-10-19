@@ -18,7 +18,7 @@ floor's aiohttp import fails before tests can collect.
 
 Both HA versions provide `LocalOAuth2ImplementationWithPkce`,
 `httpx_client.get_async_client`, repairs and `ConfigEntry.runtime_data`. PM4
-first appears at this floor; entity-class corrections are the following task.
+first appears at this floor and is used unconditionally for PM4 sensors.
 Device and sensor identities include environment, Auth0 subject and device uid;
 each entry owns its own device rows on both HA ends. No deprecated device-registry
 add/remove-config-entry arguments are used.
@@ -46,9 +46,11 @@ public-PyPI installation. No production deployment is part of this packet.
   on both supported ends.
 - Ordinary entity IDs, names, areas, disabled state and recorder history are
   preserved by updating unique IDs and device identifiers on the existing rows.
-  VOC/NOx rows retain their original unique IDs and record the resolved uid for
-  the next task's correction. That correction creates new index entities and
-  is the explicit exception to entity-ID preservation.
+  Original VOC/NOx AQI rows retain their unique IDs and entity IDs, are disabled
+  (existing user-disabled state is kept), and keep their recorder history and
+  statistics. Separate VOC/NOx index entities use `_index` keys, no device class,
+  and fresh recorder statistics. This is the explicit exception to entity-ID
+  preservation. PM4 keeps its existing entity ID, unit and statistic.
 - Unresolved legacy IDs remain untouched and unavailable, appear in diagnostics,
   and are removable only through the user's repair confirmation.
 - Auth failures request reauthentication; backend failures retry setup. A different
@@ -57,11 +59,19 @@ public-PyPI installation. No production deployment is part of this packet.
   Legacy subjects are recovered from Auth0 RS256 signatures with issuer and
   audience verification. An expired signed token may bind the original account
   identity, but never authorizes polling; fresh sign-ins use authenticated userinfo.
-- H1–H4 are fixed; H5–H7 remain strict expected failures until the entity task.
+- H1–H7 are fixed. The gate rejects any remaining unfixed defect.
+- Devices and metrics are discovered on coordinator updates, using the existing
+  180-second poll. Three successful complete inventory absences remove only the
+  owning entry's rows; failed or invalid inventory fetches do not count. Telemetry
+  failures do not invalidate a successful inventory. A present device resets the
+  counter even when offline/stale; offline/stale sensors show unavailable.
+- Known sensors use translated entity names, measurement state classes and native
+  units. Local metadata checks verify `brand/icon.png` and `brand/logo.png` PNGs;
+  these checks are not upstream HACS validation.
 
 ## Validation
 
 Targeted offline tests use the real candidate SDK with a fixture backend and
 seeded HA registries at both ends. Evidence lives in the run
-`smarthome-w6-oct19/results/HA1-*`. The full repository gate is the lane harness's
+`smarthome-w6-oct19/results/HA1-*` and `HA2-*`. The full repository gate is the lane harness's
 responsibility; the live staging upgrade is task 32.

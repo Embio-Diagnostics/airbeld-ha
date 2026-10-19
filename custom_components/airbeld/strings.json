@@ -2,29 +2,29 @@
   "config": {
     "step": {
       "pick_implementation": {
-        "title": "Airbeld Authentication"
+        "title": "airbeld™ Authentication"
       },
       "reauth_confirm": {
-        "title": "Sign in to Airbeld again",
+        "title": "Sign in to airbeld™ again",
         "description": "Sign in with the same account originally used for this integration. Your devices and sensors will be retained."
       }
     },
     "abort": {
       "already_configured": "Account is already configured",
       "missing_configuration": "Authentication setup failed. Please restart Home Assistant and try again.",
-      "oauth_error": "Authentication failed. Please try again or check your Airbeld account credentials.",
+      "oauth_error": "Authentication failed. Please try again or check your airbeld™ account credentials.",
       "cannot_connect": "The identity service is unavailable. Please try again later.",
-      "wrong_account": "Sign in with the original Airbeld account. A different account cannot replace this integration.",
+      "wrong_account": "Sign in with the original airbeld™ account. A different account cannot replace this integration.",
       "reauth_successful": "Reauthentication was successful."
     }
   },
   "issues": {
     "duplicate_account": {
-      "title": "Duplicate Airbeld account",
+      "title": "Duplicate airbeld™ account",
       "description": "This account is already configured in the same environment. Only the oldest integration entry is loaded. Remove the later duplicate entry from Devices & services."
     },
     "unresolved_legacy": {
-      "title": "Legacy Airbeld devices could not be resolved",
+      "title": "Legacy airbeld™ devices could not be resolved",
       "fix_flow": {
         "step": {
           "confirm": {
@@ -38,8 +38,23 @@
   "options": {
     "step": {
       "init": {
-        "title": "Airbeld Options"
+        "title": "airbeld™ Options"
       }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "temperature": {"name": "Temperature"},
+      "humidity": {"name": "Humidity"},
+      "pm1": {"name": "PM1"},
+      "pm2p5": {"name": "PM2.5"},
+      "pm4": {"name": "PM4"},
+      "pm10": {"name": "PM10"},
+      "co2": {"name": "CO₂"},
+      "voc_index": {"name": "VOC index"},
+      "nox_index": {"name": "NOx index"},
+      "iaq": {"name": "Air quality"},
+      "comfort": {"name": "Comfort"}
     }
   }
 }

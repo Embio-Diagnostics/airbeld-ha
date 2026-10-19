@@ -6,6 +6,9 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
+from homeassistant.core import callback
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 if TYPE_CHECKING:
@@ -18,40 +21,83 @@ from .coordinator import AirbeldDataUpdateCoordinator
 from .identity import device_identifier, sensor_unique_id
 
 _LOGGER = logging.getLogger(__name__)
+PARALLEL_UPDATES = 0
 
 
 async def async_setup_entry(
-    _hass: HomeAssistant,
+    hass: HomeAssistant,
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Airbeld sensors."""
     coordinator: AirbeldDataUpdateCoordinator = config_entry.runtime_data
 
-    entities = []
-
-    # Create sensors dynamically for each device and ALL available metrics
-    for device_id, device_data in coordinator.data.items():
-        device = device_data["device"]
-        telemetry = device_data["telemetry"]
-
-        # Create a sensor for each metric returned by the SDK
-        for sensor_name, metric_data in telemetry.items():
-            entities.append(
-                AirbeldSensor(
-                    coordinator,
-                    device_id,
-                    device,
-                    sensor_name,
-                    metric_data,
-                )
+    registry = er.async_get(hass)
+    for entity_id, legacy in config_entry.data.get("legacy_voc_nox", {}).items():
+        row = registry.async_get(entity_id)
+        if (
+            row
+            and row.config_entry_id == config_entry.entry_id
+            and row.unique_id == legacy["unique_id"]
+            and row.disabled_by is None
+        ):
+            registry.async_update_entity(
+                entity_id, disabled_by=er.RegistryEntryDisabler.INTEGRATION
             )
+    added: set[tuple[str, str]] = set()
+    generations: dict[str, int] = {}
 
-    async_add_entities(entities, update_before_add=False)
+    @callback
+    def discover() -> None:
+        """Discover new metrics from the coordinator listener without another timer."""
+        for uid, device in coordinator.inventory.items():
+            dr.async_get(hass).async_get_or_create(
+                config_entry_id=config_entry.entry_id,
+                identifiers={
+                    (
+                        DOMAIN,
+                        device_identifier(
+                            coordinator.environment, coordinator.subject, uid
+                        ),
+                    )
+                },
+                name=device.display_name or device.name,
+                manufacturer="airbeld™",
+                model=device.type or device.name,
+            )
+        for uid, generation in coordinator.removal_generation.items():
+            if generations.get(uid, 0) != generation:
+                added.difference_update({item for item in added if item[0] == uid})
+                generations[uid] = generation
+        entities = []
+        for device_id, device_data in (coordinator.data or {}).items():
+            if device_id not in coordinator.inventory:
+                continue
+            for sensor_name, metric_data in device_data["telemetry"].items():
+                identity = (device_id, sensor_name)
+                if identity in added:
+                    continue
+                added.add(identity)
+                entities.append(
+                    AirbeldSensor(
+                        coordinator,
+                        device_id,
+                        device_data["device"],
+                        sensor_name,
+                        metric_data,
+                    )
+                )
+        if entities:
+            async_add_entities(entities, update_before_add=False)
+
+    config_entry.async_on_unload(coordinator.async_add_listener(discover))
+    discover()
 
 
 class AirbeldSensor(CoordinatorEntity[AirbeldDataUpdateCoordinator], SensorEntity):
     """Representation of an Airbeld sensor."""
+
+    _attr_has_entity_name = True
 
     def __init__(
         self,
@@ -68,15 +114,20 @@ class AirbeldSensor(CoordinatorEntity[AirbeldDataUpdateCoordinator], SensorEntit
         self._device = device
         self._sensor_name = sensor_name
 
-        # Entity attributes - use SDK's display_name
-        # Don't include device name in entity name - HA automatically prepends it
+        key = f"{sensor_name}_index" if sensor_name in ("voc", "nox") else sensor_name
         self._attr_unique_id = sensor_unique_id(
-            coordinator.environment, coordinator.subject, device_id, sensor_name
+            coordinator.environment, coordinator.subject, device_id, key
         )
-        for legacy in coordinator.entry.data.get("legacy_voc_nox", {}).values():
-            if legacy["uid"] == device_id and legacy["sensor"] == sensor_name:
-                self._attr_unique_id = legacy["unique_id"]
-        self._attr_name = metric_data["display_name"]
+        self._attr_translation_key = key
+        # Unknown SDK metrics retain their server-provided label; known metrics
+        # use HA's translated entity names (no device-name prefix in the label).
+        if sensor_name not in SENSOR_DEVICE_CLASSES and sensor_name not in (
+            "voc",
+            "nox",
+            "iaq",
+            "comfort",
+        ):
+            self._attr_name = metric_data["display_name"]
 
         # Sensor configuration from SDK metadata
         # For AQI sensors, HA expects None instead of "-"
@@ -110,7 +161,7 @@ class AirbeldSensor(CoordinatorEntity[AirbeldDataUpdateCoordinator], SensorEntit
                 )
             },
             "name": device_name,
-            "manufacturer": "Airbeld",
+            "manufacturer": "airbeld™",
             "model": device_model,
             "sw_version": None,
         }
@@ -162,11 +213,7 @@ class AirbeldSensor(CoordinatorEntity[AirbeldDataUpdateCoordinator], SensorEntit
         if not device_data:
             return False
 
-        # Check device status if available (DeviceReadings doesn't have status field)
-        # If we successfully fetched data, consider the device online
         device = device_data.get("device")
-        if device and hasattr(device, "status"):
-            return device.status != "offline"
-
-        # Retain initial availability policy; telemetry-level corrections are task 22.
-        return True
+        return bool(
+            device and device.status == "online" and not getattr(device, "stale", False)
+        )

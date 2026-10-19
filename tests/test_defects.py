@@ -3,7 +3,6 @@
 from unittest.mock import AsyncMock, patch
 from urllib.parse import parse_qs, urlparse
 
-import pytest
 from homeassistant import config_entries
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.helpers import config_entry_oauth2_flow
@@ -14,6 +13,7 @@ from custom_components.airbeld.config_flow import (
     async_register_implementation,
 )
 from custom_components.airbeld.const import DOMAIN, SENSOR_DEVICE_CLASSES
+from custom_components.airbeld.identity import sensor_unique_id
 from custom_components.airbeld.sensor import AirbeldSensor
 from custom_components.airbeld.sensor import async_setup_entry as setup_sensors
 
@@ -78,9 +78,6 @@ async def test_h4_runtime_data(hass, coordinator):
     assert getattr(entry, "runtime_data", None) is coordinator
 
 
-@pytest.mark.xfail(
-    strict=True, raises=AssertionError, reason="H5: missing has_entity_name"
-)
 async def test_h5_entity_name(coordinator):
     sensor = AirbeldSensor(
         coordinator,
@@ -92,9 +89,6 @@ async def test_h5_entity_name(coordinator):
     assert sensor.has_entity_name
 
 
-@pytest.mark.xfail(
-    strict=True, raises=AssertionError, reason="H6: only first refresh creates entities"
-)
 async def test_h6_discover_after_refresh(hass, coordinator):
     entry = coordinator.entry
     entities = []
@@ -102,20 +96,19 @@ async def test_h6_discover_after_refresh(hass, coordinator):
     assert len(entities) == 1
     changed = dict(coordinator.data)
     changed["device-84"] = coordinator.data["device-42"]
+    coordinator.inventory["device-84"] = coordinator.inventory["device-42"]
     coordinator.async_set_updated_data(changed)
     await hass.async_block_till_done()
     assert {entity.unique_id for entity in entities} == {
         entities[0].unique_id,
-        "airbeld_84_temperature",
+        sensor_unique_id(
+            coordinator.environment, coordinator.subject, "device-84", "temperature"
+        ),
     }
 
 
-@pytest.mark.xfail(
-    strict=True, raises=AssertionError, reason="H7: wrong device classes"
-)
 async def test_h7_device_classes(coordinator):
-    # PM4 is absent at the floor: never mislabel it as PM10 there.
-    expected = getattr(SensorDeviceClass, "PM4", None)
+    expected = SensorDeviceClass.PM4
     sensor = AirbeldSensor(
         coordinator,
         "device-42",

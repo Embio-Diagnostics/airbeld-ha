@@ -25,9 +25,7 @@ SENSOR_DEVICE_CLASSES = {
     "humidity": SensorDeviceClass.HUMIDITY,
     "pm1": SensorDeviceClass.PM1,
     "pm2p5": SensorDeviceClass.PM25,
-    "pm4": SensorDeviceClass.PM10,  # No PM4 class in HA, use PM10
+    "pm4": SensorDeviceClass.PM4,
     "pm10": SensorDeviceClass.PM10,
     "co2": SensorDeviceClass.CO2,
-    "voc": SensorDeviceClass.AQI,  # VOC Index as air quality index
-    "nox": SensorDeviceClass.AQI,  # NOx Index as air quality index
 }

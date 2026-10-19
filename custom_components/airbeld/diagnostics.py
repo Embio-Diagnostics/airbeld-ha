@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from homeassistant.components.diagnostics import async_redact_data
+
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
@@ -22,10 +24,7 @@ async def async_get_config_entry_diagnostics(
     diagnostics_data = {
         "entry": {
             "title": entry.title,
-            "data": {
-                # Redact access token
-                "access_token": "**REDACTED**"
-            },
+            "data": {key: entry.data[key] for key in ("environment", "sub", "token")},
         },
         "coordinator": {
             "last_update_success": coordinator.last_update_success,
@@ -57,4 +56,6 @@ async def async_get_config_entry_diagnostics(
             "telemetry_sample": dict(telemetry.items()) if telemetry else {},
         }
 
-    return diagnostics_data
+    return async_redact_data(
+        diagnostics_data, {"access_token", "refresh_token", "id_token", "sub", "token"}
+    )

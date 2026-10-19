@@ -40,7 +40,7 @@ async def test_oauth_entry_and_registration(hass):
     ):
         result = await flow.async_oauth_create_entry(data)
     assert result["type"] == "create_entry"
-    assert result["title"] == "Airbeld"
+    assert result["title"] == "airbeld™"
     assert result["data"]["token"] == data["token"]
     assert result["data"]["sub"] == "auth0|one"
     assert flow.unique_id == account_id(result["data"]["environment"], "auth0|one")
@@ -85,7 +85,8 @@ async def test_sensor_values_metadata_and_availability(hass, coordinator):
     assert sensor.unique_id == sensor_unique_id(
         coordinator.environment, coordinator.subject, "device-42", "temperature"
     )
-    assert sensor.name == "Temperature"
+    assert sensor.translation_key == "temperature"
+    assert sensor.has_entity_name
     assert sensor.device_class == SensorDeviceClass.TEMPERATURE
     assert sensor.state_class == SensorStateClass.MEASUREMENT
     assert sensor.native_unit_of_measurement == "°C"

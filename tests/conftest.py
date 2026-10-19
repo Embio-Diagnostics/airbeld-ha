@@ -55,6 +55,7 @@ async def coordinator(hass, payload):
             "name": "Monitor",
             "displayName": "Kitchen",
             "legacyId": None,
+            "status": "online",
         }
     ]
 

@@ -135,7 +135,7 @@ class OAuth2FlowHandler(
         await self.async_set_unique_id(account_id(env, sub))
         self._abort_if_unique_id_configured()
         return self.async_create_entry(
-            title="Airbeld",
+            title="airbeld™",
             data={**data, "environment": env, "sub": sub},
         )
 

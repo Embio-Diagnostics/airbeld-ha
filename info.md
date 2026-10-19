@@ -1,6 +1,6 @@
-# Airbeld Integration
+# airbeld™ Integration
 
-Monitor your indoor air quality with Airbeld devices directly in Home Assistant.
+Monitor your indoor air quality with airbeld™ devices directly in Home Assistant.
 
 ## Features
 
@@ -13,12 +13,12 @@ Monitor your indoor air quality with Airbeld devices directly in Home Assistant.
 ## Quick Setup
 
 1. Add the integration in Settings → Devices & Services
-2. Authenticate with your Airbeld account (OAuth2)
+2. Authenticate with your airbeld™ account (OAuth2)
 3. Your devices will appear automatically
 
 ## Requirements
 
-- Airbeld account with registered devices
+- airbeld™ account with registered devices
 - Home Assistant 2025.10.0+ (see `docs/ha-compatibility.md` for exact test versions)
 - Internet connection
 
@@ -26,5 +26,7 @@ Secure authentication via Auth0 OAuth2.
 
 The v2 candidate upgrades ordinary sensors in place and uses PKCE sign-in.
 Older HA installations keep v0.1.2 (v1). Each account has its own device and sensor
-copies. The later VOC/NOx index correction creates new entities; the identity
-upgrade retains the old rows until that correction.
+copies. Original VOC/NOx AQI rows are disabled with history intact; new index
+entities start separate statistics. PM4 retains its entity and statistic.
+New devices appear on the existing 180-second poll. Offline/stale devices show
+unavailable; three complete inventory absences remove only this account's rows.
