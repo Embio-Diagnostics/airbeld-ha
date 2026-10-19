@@ -348,7 +348,7 @@ just dev-down
 just dev-staging-down
 ```
 
-Both commands build the pinned HA 2026.10.1 image with SDK 0.4.0 preinstalled,
+Both commands build the pinned HA 2026.10.1 image with the vendored SDK 1.0.0 candidate (`vendor/wheels/`) preinstalled,
 boot without credentials, mount the integration read-only, and use separate named
 Docker volumes. No HA config, database, token or log is written into the checkout.
 HA's own image remains root because its bundled runtime expects that layout;

@@ -2,3 +2,8 @@
 !scripts/
 scripts/*
 !scripts/dev_bootstrap.py
+!vendor/
+vendor/*
+!vendor/wheels/
+vendor/wheels/*
+!vendor/wheels/airbeld_api_sdk-1.0.0-py3-none-any.whl
